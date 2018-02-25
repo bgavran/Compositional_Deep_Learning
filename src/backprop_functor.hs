@@ -3,47 +3,66 @@
 import Control.Category
 import Control.Monad
 
-type I p a b = (p -> a -> b)
-type U p a b = (p -> a -> b -> p)
-type R p a b = (p -> a -> b -> a)
-
-ijComp :: (p -> a -> b) -> (q -> b -> c) -> ((p, q) -> a -> c)
-ijComp i j = \(p, q) a -> j q (i p a)
-
-uvComp :: U p a b -> U q b c -> b -> U (p, q) a c
-uvComp u v b = \(p, q) a c -> (u p a b, v q b c)
-
-rsComp :: R p a b -> R q b c -> b -> R (p, q) a c
-rsComp r s b = \(p, q) a c -> r p a (s q b c)
+type I p a b = (MyParam p -> a -> b)
+type U p a b = (MyParam p -> a -> b -> MyParam p)
+type R p a b = (MyParam p -> a -> b -> a)
 
 
---create :: p -> a -> b -> (p, I p a b, U p a b, R p a b)
---create p a b = (p, )
+reduceParam :: MyParam p -> MyParam q-> MyParam (p,q)
+reduceParam (Param p) (Param q) = Param (p,q)
+
+implComp :: I p a b -> I q b c -> I (p,q) a c
+implComp i j = \(Param (p,q)) a -> j (Param q) (i (Param p) a)
+
+updComp :: U p a b -> U q b c -> b -> U (p, q) a c
+updComp u v b = \(Param (p,q)) a c -> reduceParam (u (Param p) a b) (v (Param q) b c)
+
+reqComp :: R p a b -> R q b c -> b -> R (p,q) a c
+reqComp r s b = \(Param (p,q)) a c -> r (Param p) a (s (Param q) b c)
+
+
+data MyParam p
+  = Param p 
+  deriving (Eq, Show)
 
 data Learner p a b = Learner {
-  impl :: p -> a -> b,
-  upd :: p -> a -> b -> p,
-  req :: p -> a -> b -> a
+  impl :: (MyParam p) -> a -> b,
+  upd :: (MyParam p) -> a -> b -> (MyParam p),
+  req :: (MyParam p) -> a -> b -> a
 }
 
-l1 = Learner {impl = (*), 
-             upd = (\_ a _ -> a), 
-             req = (\p _ _ -> p)}
+l1 = Learner {impl = (\(Param p) a -> p * a), 
+             upd = (\_ a _ -> (Param a)), 
+             req = (\(Param p) _ _ -> p)}
 
-l2 = Learner {impl = (*), 
-             upd = (\_ a _ -> a), 
-             req = (\p _ _ -> p)}
+l2 = Learner {impl = (\(Param p) a -> p + a), 
+             upd = (\_ a _ -> (Param 1)), 
+             req = (\(Param p) _ _ -> 1)}
 
-instance Category (Learner g) where
+instance Category (Learner p) where
   id = Learner {impl = (\_ a -> a),
                 upd = (\p _ _ -> p),
                 req = (\_ a _ -> a)}
-
   l2 . l1 = Learner {
-                     impl = undefined,
+                     impl = undefined, --(impl l1) `implComp` (impl l2), 
                      upd = undefined,
                      req = undefined
                     }
+
+--instance Cat Learner where
+--  objid = Learner {impl = (\_ a -> a),
+--                upd = (\p _ _ -> p),
+--                req = (\_ a _ -> a)}
+--
+--  l2 `objcomp` l1 = Learner {
+--                     impl = undefined,
+--                     upd = undefined,
+--                     req = undefined
+--                    }
+
+class Cat obj where
+  id :: obj a -> obj a
+  (.) :: (obj b -> obj c) -> (obj a -> obj b) -> obj a -> obj c
 
 newtype Kleisli m a b = Kleisli { runKleisli :: a -> m b }
 
