@@ -3,70 +3,46 @@
 import Control.Category
 import Control.Monad
 
-type I p a b = (p -> a -> b)
-type U p a b = (p -> a -> b -> p)
-type R p a b = (p -> a -> b -> a)
-
-implComp :: I p a b -> I q b c -> I (p, q) a c
-implComp i j = \(p, q) a -> j q (i p a)
-
-updComp :: U p a b -> U q b c -> b -> U (p, q) a c
-updComp u v b = \(p, q) a c -> (u p a b, v q b c)
-
-reqComp :: R p a b -> R q b c -> b -> R (p, q) a c
-reqComp r s b = \(p, q) a c -> r p a (s q b c)
-
-
 data LearnerType p a b = Learner {
-  param :: p,
   impl :: p -> a -> b,
   upd :: p -> a -> b -> p,
   req :: p -> a -> b -> a
 }
 
-l1 = Learner {param = 3,
-             impl = (\p a -> p * a), 
-             upd = (\_ a _ -> a), 
-             req = (\p _ _ -> p)}
 
-l2 = Learner {param = 4,
-             impl = (\p a -> p + a), 
-             upd = (\_ a _ -> 1), 
-             req = (\p _ _ -> 1)}
-
+{- 
+ composition of impl, upd and req can't be defined outside of Learner 
+ since we need to define let b = ... 
+-}
 learnerComp :: LearnerType q b c -> LearnerType p a b -> LearnerType (p, q) a c
-learnerComp l2 l1 = Learner {
-                     param = (param l1, param l2),
-                     impl = implComp (impl l1) (impl l2), 
-                     upd = undefined, --updComp (upd l1) (upd l2) ((impl l1) (param l1) a),
-                     req = undefined --reqComp (req l1) (req l2) ((impl l1) a)
-                    }
+learnerComp l2 l1 = Learner {impl = \(p, q) a -> (impl l2) q ((impl l1) p a), 
+                             upd = \(p, q) a c -> let b = (impl l1) p a
+                                                  in ((upd l1) p a b, (upd l2) q b c),
+                             req = \(p, q) a c -> let b = (impl l1) p a
+                                                  in (req l1) p a ((req l2) q b c)
+}
+
+l1 = Learner {impl = \p a -> p * a, 
+             upd = \_ a _ -> a, 
+             req = \p _ _ -> p}
+
+l2 = Learner {impl = \p a -> p + a, 
+             upd = \_ a _ -> 1, 
+             req = \p _ _ -> 1}
+
+l3 = learnerComp l2 l1
+
+c = (impl l3) (2, 3) 4 -- super interesting :)
+
+
 
 instance Category (LearnerType p) where
-  id = Learner {param = undefined,
-                impl = (\_ a -> a),
+  id = Learner {impl = (\_ a -> a),
                 upd = (\p _ _ -> p),
                 req = (\_ a _ -> a)}
-  l2 . l1 = Learner {
-                     param = undefined,
-                     impl = undefined, --(impl l1) `implComp` (impl l2), 
-                     upd = undefined,
-                     req = undefined
-                    }
+  (.) = undefined --learnerComp 
 
  
-
---instance Cat Learner where
---  objid = Learner {impl = (\_ a -> a),
---                upd = (\p _ _ -> p),
---                req = (\_ a _ -> a)}
---
---  l2 `objcomp` l1 = Learner {
---                     impl = undefined,
---                     upd = undefined,
---                     req = undefined
---                    }
-
 class Cat obj where
   id :: obj a -> obj a
   (.) :: (obj b -> obj c) -> (obj a -> obj b) -> obj a -> obj c
