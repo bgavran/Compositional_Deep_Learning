@@ -1,4 +1,6 @@
-import Control.Category
+{-# LANGUAGE TypeOperators #-}
+
+import qualified Control.Category as Cat
 import Control.Monad
 
 data MyParam p
@@ -14,19 +16,19 @@ data LearnerType p a b = Learner {
   req :: MyParam p -> a -> b -> a
 }
 
-instance Category (LearnerType p) where
+instance Cat.Category (LearnerType p) where
   id = Learner {param = undefined,
                 impl = \_ a -> a,
                 upd = \p _ _ -> p,
                 req = \_ a _ -> a}
 
-  (.) l2 l1 = Learner {param = ParamProd (param l1) (param l2),
-                       impl = \(ParamProd p q) a -> let b = (impl l1) p a
-                                                    in (impl l2) q b, 
-                       upd = \(ParamProd p q) a c -> let b = (impl l1) p a
-                                                     in ParamProd ((upd l1) p a b) ((upd l2) q b c),
-                       req = \(ParamProd p q) a c -> let b = (impl l1) p a
-                                                     in (req l1) p a ((req l2) q b c)}
+  l2 . l1 = Learner {param = ParamProd (param l1) (param l2),
+                     impl = \(ParamProd p q) a -> let b = (impl l1) p a
+                                                  in (impl l2) q b, 
+                     upd = \(ParamProd p q) a c -> let b = (impl l1) p a
+                                                   in ParamProd ((upd l1) p a b) ((upd l2) q b c),
+                     req = \(ParamProd p q) a c -> let b = (impl l1) p a
+                                                   in (req l1) p a ((req l2) q b c)}
 
 monProd :: LearnerType p c d -> LearnerType p a b -> LearnerType p (a, c) (b, d)
 monProd l2 l1 = Learner {param = ParamProd (param l1) (param l2),
@@ -85,7 +87,7 @@ l3 = Learner {param = NoParam,
               upd = \_ _ _ -> NoParam,
               req = \p a b -> b * ((impl l3) p a)}
 
-lSerial = l2 Control.Category.. l1
+lSerial = l2 Cat.. l1
 lParallel = l2 `monProd` l1
 
 f :: LearnerType p a b -> a -> b
