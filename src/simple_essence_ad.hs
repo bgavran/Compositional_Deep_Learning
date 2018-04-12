@@ -75,14 +75,3 @@ tpl = s `x` right
 
 m = mul Cat.. tpl
 
---
-
-
-
-
-
-main = putStrLn "alpha" >>= k
-
-k = \_ -> putStrLn "beta" >>= j
-
-j = \_ -> putStrLn "gamma" 
