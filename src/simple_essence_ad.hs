@@ -1,17 +1,19 @@
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 import qualified Control.Category as Cat
 
-newtype Fn a b = Fn {eval :: a -> (b, b -> a)}
+newtype Fn a b = Fn {eval :: a -> (b, a -> b)}
 
---linearF :: (a -> b) -> Fn a b
---linearF f = Fn $ \a -> (f a, f)
+linearF :: (a -> b) -> Fn a b
+linearF f = Fn $ \a -> (f a, f)
 
 instance Cat.Category Fn where
-  id      = Fn $ \x -> (x, id)
+  id      = linearF id
   g . f   = Fn $ \a -> let (b, f') = eval f a
                            (c, g') = eval g b
-                       in (c, f' . g')
+                       in (c, g' . f')
 
 class Cat.Category k => Monoidal k where
   x :: (a `k` c) -> (b `k` d) -> ((a, b) `k` (c, d)) 
@@ -26,52 +28,32 @@ class Monoidal k => Cartesian k where
   exr :: (a, b) `k` b
   dup :: a `k` (a, a)
 
---instance Cartesian Fn where
---  exl = Fn $ \(x, y) -> (x, \x -> (x, 0))
---  dup = Fn $ \x -> ((x, x), \(x0, x1) -> x0 + x1)
+instance Cartesian Fn where
+  exl = linearF fst
+  exr = linearF snd
+  dup = linearF $ \x -> (x, x)
 
+-- Error in the paper, in paper cocartesian requires just category.
+-- Or is it a mistake, perhaps the 'x' is the 'x' I defined already and not tuple?
 
-sigm :: Fn Double Double
-sigm = Fn $ \x -> let y = 1 / (1 + (exp $ negate x))
-                  in (y, \z -> z * y * (1 - y))
+class Monoidal k => Cocartesian k where
+  inl :: a `k` (a, b)
+  inr :: b `k` (a, b)
+  jam :: (a, a) `k` a
 
-mul :: Fn (Double, Double) Double
-mul  = Fn $ \(x, y) -> (x * y, \z -> (z * y, z * x))
+t :: Cartesian k => (a `k` c) -> (a `k` d) -> (a `k` (c, d))
+f `t` g = (f `x` g) Cat.. dup
 
-comul :: Fn Double (Double, Double)
-comul = Fn $ \x -> ((x, x), \(z1, z2) -> z1 + z2)
+v :: Cocartesian k => (c `k` a) -> (d `k` a) -> ((c, d) `k` a)
+f `v` g = jam Cat.. (f `x` g)
 
-myFst :: Num c => Fn a (b, c) -> Fn a b
-myFst n = Fn $ \a -> let ((b, c), dBCdA) = eval n a
-                     in (b, \z -> dBCdA (z, 0))
-
-mySnd :: Num b => Fn a (b, c) -> Fn a c
-mySnd n = Fn $ \a -> let ((b, c), dBCdA) = eval n a
-                     in (c, \z -> dBCdA (0, z))
-
-{-
-
-
-OUTPUT ==>  mul
-	   /   \
-	  /     \
-	sigm     |
-	   \    /
-	    \  /
-           (x, x)
-             |
-           comul
-             |
-             |
-INPUT ==>    x 
--}
-
-left = myFst comul
-right = mySnd comul
-
-s = sigm Cat.. left
-
-tpl = s `x` right
-
-m = mul Cat.. tpl
+class NumCat k a where
+  negateC :: a `k` a
+  addC :: (a, a) `k` a
+  mulC :: (a, a) `k` a
+ 
+instance Num a => NumCat (->) a where
+  negateC = negate
+  addC = uncurry (+)
+  mulC = uncurry (*)
 
