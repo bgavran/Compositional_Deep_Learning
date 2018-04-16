@@ -36,17 +36,19 @@ instance Cat.Category D where
 instance Cat.Monoidal D where
   f `x` g = D $ \(a, b) -> let (c, f') = eval f a
                                (d, g') = eval g b
-                           in ((c, d), \(z1, z2) -> (f' z1, g' z2))
+                           in ((c, d), f' `Cat.x` g')
 
 instance Cat.Cartesian D where
-  exl = linearD fst
-  exr = linearD snd
-  dup = linearD $ \x -> (x, x)
+  exl = linearD Cat.exl
+  exr = linearD Cat.exr
+  dup = linearD Cat.dup
 
 t :: Cat.Cartesian k => (a `k` c) -> (a `k` d) -> (a `k` (c, d))
 f `t` g = (f `Cat.x` g) Cat.. Cat.dup
 
-v :: (Num a, Cat.Monoidal k, Cat.Cocartesian k) => (c `k` a) -> (d `k` a) -> ((c, d) `k` a)
+v :: (Num a, 
+      Cat.Monoidal k, 
+      Cat.Cocartesian k) => (c `k` a) -> (d `k` a) -> ((c, d) `k` a)
 f `v` g = Cat.jam Cat.. (f `Cat.x` g)
 
 newtype a ->+ b = AddFun (a -> b)
@@ -69,14 +71,22 @@ instance Cat.Cocartesian (->+) where
   jam = AddFun $ \(a, b) -> a + b
 
 instance Num a => Cat.Scalable (->+) a where
-  scale a = AddFun (\x -> a*x)
+  scale a = AddFun $ \x -> a*x
+
+----------------
  
 instance Num a => Cat.NumCat (->) a where
   negateC = negate
   addC = uncurry (+)
   mulC = uncurry (*)
 
+-- Missing Num constraint in the paper?
 instance Num a => Cat.NumCat D a where
   negateC = linearD Cat.negateC
   addC = linearD Cat.addC
-  --mulC = D $ \(a, b) -> (a * b, (scale b) `v` (scale a))
+  --mulC = D $ \(a, b) -> (a * b, (Cat.scale b) `v` (Cat.scale a))
+  mulC = D $ \(a, b) -> (a * b, \(da, db) -> da + db)
+
+f :: (Cat.NumCat k a,
+      Cat.Cartesian k) => k a a
+f = Cat.mulC Cat.. (Cat.id `t` Cat.id)
