@@ -1,6 +1,7 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE InstanceSigs #-}
 
 import qualified Control.Category as Cat
 
@@ -13,12 +14,24 @@ class Monoidal k => Cartesian k where
   dup :: a `k` (a, a)
 
 -- Error in the paper, in the paper cocartesian class requires just category and not monoidal?
+-- I haven't figured out yet how ConstraintKinds work so that's why there's a Num constraint here and throughout many places in the code. 
 
-class Monoidal k => Cocartesian k where
-  inl :: a `k` (a, b)
-  inr :: b `k` (a, b)
-  jam :: (a, a) `k` a
+class Cat.Category k => Cocartesian k where
+  inl :: (Num a, Num b) => a `k` (a, b)
+  inr :: (Num a, Num b) => b `k` (a, b)
+  jam :: Num a => (a, a) `k` a
 
+----------------
+
+instance Monoidal (->) where
+  f `x` g = \(a, b) -> (f a, g b)
+
+instance Cartesian (->) where
+  exl = \(a, _) -> a
+  exr = \(_, b) -> b
+  dup = \a -> (a, a)
+
+----------------
 
 newtype D a b = D {eval :: a -> (b, a -> b)}
 
@@ -44,13 +57,10 @@ instance Cartesian D where
 t :: Cartesian k => (a `k` c) -> (a `k` d) -> (a `k` (c, d))
 f `t` g = (f `x` g) Cat.. dup
 
-v :: Cocartesian k => (c `k` a) -> (d `k` a) -> ((c, d) `k` a)
+v :: (Num a, Monoidal k, Cocartesian k) => (c `k` a) -> (d `k` a) -> ((c, d) `k` a)
 f `v` g = jam Cat.. (f `x` g)
 
 newtype a ->+ b = AddFun (a -> b)
-
-instance Monoidal (->) where
-  f `x` g = \(a, b) -> (f a, g b)
 
 instance Cat.Category (->+) where
   id = AddFun id
@@ -59,17 +69,34 @@ instance Cat.Category (->+) where
 instance Monoidal (->+) where
   (AddFun f) `x` (AddFun g) = AddFun (f `x` g)
 
---instance Cartesian (->+) where
---  exl = AddFun exl
---  exr = AddFun exr
---  dup = AddFun dup
+instance Cartesian (->+) where
+  exl = AddFun exl
+  exr = AddFun exr
+  dup = AddFun dup
+
+instance Cocartesian (->+) where
+  inl = AddFun inlF
+  inr = AddFun inrF
+  jam = AddFun jamF
+
+inlF :: (Num a, Num b) => a -> (a, b)
+inlF = \a -> (a, 0)
+inrF :: (Num a, Num b) => b -> (a, b)
+inrF = \b -> (0, b)
+jamF :: Num a => (a, a) -> a
+jamF = \(a, b) -> a + b
 
 
-{-
 class NumCat k a where
   negateC :: a `k` a
   addC :: (a, a) `k` a
   mulC :: (a, a) `k` a
+
+class Scalable k a where
+  scale :: a -> (a `k` a)
+
+instance Num a => Scalable (->+) a where
+  scale a = AddFun (\x -> a*x)
  
 instance Num a => NumCat (->) a where
   negateC = negate
@@ -79,6 +106,4 @@ instance Num a => NumCat (->) a where
 instance Num a => NumCat D a where
   negateC = linearD negateC
   addC = linearD addC
-  mulC = D $ \(a, b) -> (a * b, )
- 
--}
+  --mulC = D $ \(a, b) -> (a * b, (scale b) `v` (scale a))
