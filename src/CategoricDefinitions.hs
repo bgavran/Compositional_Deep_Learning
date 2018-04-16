@@ -2,11 +2,13 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module CategoricDefinitions where
+import GHC.Exts (Constraint)
 
 class Category k where
-  type Obj k = Constraint
+  type Obj k a b :: Constraint
   id  :: a `k` a
   (.) :: (b `k` c) -> (a `k` b) -> (a `k` c)
 

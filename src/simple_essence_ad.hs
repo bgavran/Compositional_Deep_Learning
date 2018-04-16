@@ -2,6 +2,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE TypeFamilies #-}
 
 import qualified CategoricDefinitions as Cat
 ----------------
@@ -46,7 +47,7 @@ f `v` g = jam Cat.. (f `x` g)
 newtype a ->+ b = AddFun (a -> b)
 
 instance Cat.Category (->+) where
-  type Obj = Additive
+  type Obj a ->+ b = Num
   id = AddFun id
   (AddFun g) . (AddFun f) = AddFun (g . f)
 
