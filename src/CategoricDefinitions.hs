@@ -27,3 +27,12 @@ class Category k => Cocartesian k where
   inr :: (Num a, Num b) => b `k` (a, b)
   jam :: Num a => (a, a) `k` a
 
+--------------------------------------
+
+class NumCat k a where
+  negateC :: a `k` a
+  addC :: (a, a) `k` a
+  mulC :: (a, a) `k` a
+
+class Scalable k a where
+  scale :: a -> (a `k` a)

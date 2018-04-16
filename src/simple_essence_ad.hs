@@ -75,23 +75,16 @@ inrF = \b -> (0, b)
 jamF :: Num a => (a, a) -> a
 jamF = \(a, b) -> a + b
 
-class NumCat k a where
-  negateC :: a `k` a
-  addC :: (a, a) `k` a
-  mulC :: (a, a) `k` a
 
-class Scalable k a where
-  scale :: a -> (a `k` a)
-
-instance Num a => Scalable (->+) a where
+instance Num a => Cat.Scalable (->+) a where
   scale a = AddFun (\x -> a*x)
  
-instance Num a => NumCat (->) a where
+instance Num a => Cat.NumCat (->) a where
   negateC = negate
   addC = uncurry (+)
   mulC = uncurry (*)
 
-instance Num a => NumCat D a where
-  negateC = linearD negateC
-  addC = linearD addC
+instance Num a => Cat.NumCat D a where
+  negateC = linearD Cat.negateC
+  addC = linearD Cat.addC
   --mulC = D $ \(a, b) -> (a * b, (scale b) `v` (scale a))
