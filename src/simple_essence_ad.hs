@@ -64,17 +64,9 @@ instance Cat.Cartesian (->+) where
   dup = AddFun Cat.dup
 
 instance Cat.Cocartesian (->+) where
-  inl = AddFun inlF
-  inr = AddFun inrF
-  jam = AddFun jamF
-
-inlF :: (Num a, Num b) => a -> (a, b)
-inlF = \a -> (a, 0)
-inrF :: (Num a, Num b) => b -> (a, b)
-inrF = \b -> (0, b)
-jamF :: Num a => (a, a) -> a
-jamF = \(a, b) -> a + b
-
+  inl = AddFun $ \a -> (a, 0)
+  inr = AddFun $ \b -> (0, b)
+  jam = AddFun $ \(a, b) -> a + b
 
 instance Num a => Cat.Scalable (->+) a where
   scale a = AddFun (\x -> a*x)
