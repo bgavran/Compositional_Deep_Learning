@@ -1,19 +1,19 @@
 {-# LANGUAGE TypeOperators #-}
 
-import qualified Control.Category as Cat
+import qualified CategoricDefinitions as Cat
 import Control.Monad
 
-data MyParam p
-  = NoParam
-  | Param p
-  | ParamProd (MyParam p) (MyParam p) 
+data Param p
+  = NoP
+  | P p
+  | X (Param p) (Param p) 
   deriving (Eq, Show)
 
 data LearnerType p a b = Learner {
-  param :: MyParam p,
-  impl :: MyParam p -> a -> b,
-  upd :: MyParam p -> a -> b -> MyParam p,
-  req :: MyParam p -> a -> b -> a
+  param :: Param p,
+  impl :: Param p -> a -> b,
+  upd :: Param p -> a -> b -> Param p,
+  req :: Param p -> a -> b -> a
 }
 
 instance Cat.Category (LearnerType p) where
@@ -22,25 +22,26 @@ instance Cat.Category (LearnerType p) where
                 upd = \p _ _ -> p,
                 req = \_ a _ -> a}
 
-  l2 . l1 = Learner {param = ParamProd (param l1) (param l2),
-                     impl = \(ParamProd p q) a -> let b = (impl l1) p a
-                                                  in (impl l2) q b, 
-                     upd = \(ParamProd p q) a c -> let b = (impl l1) p a
-                                                   in ParamProd ((upd l1) p a b) ((upd l2) q b c),
-                     req = \(ParamProd p q) a c -> let b = (impl l1) p a
-                                                   in (req l1) p a ((req l2) q b c)}
+  l2 . l1 = Learner {param = (param l1) `X` (param l2),
+                     impl = \(p `X` q) a -> let b = (impl l1) p a
+                                            in (impl l2) q b, 
+                     upd = \(p `X` q) a c -> let b = (impl l1) p a
+                                             in ((upd l1) p a b) `X` ((upd l2) q b c),
+                     req = \(p `X` q) a c -> let b = (impl l1) p a
+                                             in (req l1) p a ((req l2) q b c)}
 
-monProd :: LearnerType p c d -> LearnerType p a b -> LearnerType p (a, c) (b, d)
-monProd l2 l1 = Learner {param = ParamProd (param l1) (param l2),
-                         impl = \(ParamProd p q) (a, c) -> ((impl l1) p a, (impl l2) q c),
-                         upd = \(ParamProd p q) (a, c) (b, d) -> ParamProd ((upd l1) p a b) ((upd l2) q c d),
-                         req = \(ParamProd p q) (a, c) (b, d) -> ((req l1) p a b, (req l2) q c d)}
+
+instance Cat.Monoidal (LearnerType p) where
+  l1 `x` l2 = Learner {param = (param l1) `X` (param l2),
+                       impl = \(p `X` q) (a, c) -> ((impl l1) p a, (impl l2) q c),
+                       upd = \(p `X` q) (a, c) (b, d) -> ((upd l1) p a b) `X` ((upd l2) q c d),
+                       req = \(p `X` q) (a, c) (b, d) -> ((req l1) p a b, (req l2) q c d)}
 
 etaVal = 0.01
 
-bias = Learner {param = Param 1,
-                impl = \(Param p) _ -> p,
-                upd = \(Param p) a b -> Param $ sgd p ((f bias a) - b) etaVal,
+bias = Learner {param = P 1,
+                impl = \(P p) _ -> p,
+                upd = \(P p) a b -> P $ sgd p ((f bias a) - b) etaVal,
                 req = \_ _ _ -> 0}
 
 fSigm :: Double -> Double
@@ -49,51 +50,51 @@ fSigm x = 1 / (1 + (exp $ negate x))
 dfSigm :: Double -> Double
 dfSigm x = (fSigm x) * (1 - fSigm x)
 
-sigmoid = Learner {param = NoParam,
+sigmoid = Learner {param = NoP,
                    impl = \_ a -> fSigm a,
-                   upd = \_ _ _ -> NoParam,
+                   upd = \_ _ _ -> NoP,
                    req = \_ a b -> a - (a - b) * dfSigm a}
 
 sgd :: Double -> Double -> Double -> Double
 sgd p pGrad eta = p - eta * pGrad
 
-scalarMul = Learner {param = Param 2,
-                     impl = \(Param p) a -> p * a,
-                     upd = \(Param p) a b -> Param $ sgd p (a*((f scalarMul a) - b)) etaVal,
-                     req = \(Param p) a b -> sgd a (p*((f scalarMul a) - b)) etaVal}
+scalarMul = Learner {param = P 2,
+                     impl = \(P p) a -> p * a,
+                     upd = \(P p) a b -> P $ sgd p (a*((f scalarMul a) - b)) etaVal,
+                     req = \(P p) a b -> sgd a (p*((f scalarMul a) - b)) etaVal}
 
-unit = Learner {param = Param 1,
-               impl = \(Param p) _ -> p,
-               upd = \(Param p) _ b -> Param p,
+unit = Learner {param = P 1,
+               impl = \(P p) _ -> p,
+               upd = \(P p) _ b -> P p,
                req = \_ _ _ -> 0 }
 
-mul = Learner {param = NoParam,
+mul = Learner {param = NoP,
               impl = \_ (f, s) -> f + s,
-              upd = \_ _ _ -> NoParam,
+              upd = \_ _ _ -> NoP,
               req = \_ a b -> a}
 
-l1 = Learner {param = Param 3,
-             impl = \(Param p) a -> p * a, 
-             upd = \_ a _ -> Param a, 
-             req = \(Param p) _ _ -> p}
+l1 = Learner {param = P 3,
+             impl = \(P p) a -> p * a, 
+             upd = \_ a _ -> P a, 
+             req = \(P p) _ _ -> p}
 
-l2 = Learner {param = Param 5,
-             impl = \(Param p) a -> p + a, 
-             upd = \_ a _ -> Param 1, 
+l2 = Learner {param = P 5,
+             impl = \(P p) a -> p + a, 
+             upd = \_ a _ -> P 1, 
              req = \p _ _ -> 1}
 
-l3 = Learner {param = NoParam,
+l3 = Learner {param = NoP,
               impl = \_ a -> exp a,
-              upd = \_ _ _ -> NoParam,
+              upd = \_ _ _ -> NoP,
               req = \p a b -> b * ((impl l3) p a)}
 
 lSerial = l2 Cat.. l1
-lParallel = l2 `monProd` l1
+lParallel = l2 `Cat.x` l1
 
 f :: LearnerType p a b -> a -> b
 f l a = (impl l) (param l) a
 
-df :: LearnerType p a b -> a -> b -> (MyParam p)
+df :: LearnerType p a b -> a -> b -> (Param p)
 df l a b = (upd l) (param l) a b
 
 outSerial = f lSerial 2
