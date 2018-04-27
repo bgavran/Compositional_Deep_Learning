@@ -9,58 +9,110 @@ data Param p
   | X (Param p) (Param p) 
   deriving (Eq, Show)
 
-data LearnerType p a b = Learner {
-  param :: Param p,
-  impl :: Param p -> a -> b,
-  upd :: Param p -> a -> b -> Param p,
-  req :: Param p -> a -> b -> a
+type ParamF p     = Param p
+type ImplF  p a b = Param p -> a -> b
+type UpdF   p a b = Param p -> a -> b -> Param p
+type ReqF   p a b = Param p -> a -> b -> a
+
+data Learner p a b = L {
+  param :: ParamF p,
+  impl :: ImplF p a b,
+  upd :: UpdF p a b,
+  req :: ReqF p a b
 }
 
-instance Cat.Category (LearnerType p) where
-  id = Learner {param = NoP,
-                impl  = \_ a -> a,
-                upd   = \_ _ _ -> NoP,
-                req   = \_ a _ -> a}
+instance Cat.Category (Learner p) where
+  id = L {param = NoP,
+          impl  = \NoP a   -> a,
+          upd   = \NoP _ _ -> NoP,
+          req   = \NoP a _ -> a}
 
-  l2 . l1 = Learner {param = (param l1) `X` (param l2),
-                     impl  = \(p `X` q) a   -> let b = (impl l1) p a
-                                               in (impl l2) q b, 
-                     upd   = \(p `X` q) a c -> let b = (impl l1) p a
-                                               in ((upd l1) p a b) `X` ((upd l2) q b c),
-                     req   = \(p `X` q) a c -> let b = (impl l1) p a
-                                               in (req l1) p a ((req l2) q b c)}
+  L p2 i2 u2 r2 . L p1 i1 u1 r1 = L {param = p1 `X` p2,
+                                     impl  = \(p `X` q) a   -> let b = i1 p a
+                                                               in i2 q b, 
+                                     upd   = \(p `X` q) a c -> let b = i1 p a
+                                                               in (u1 p a b) `X` (u2 q b c),
+                                     req   = \(p `X` q) a c -> let b = i1 p a
+                                                               in r1 p a (r2 q b c)}
 
 
-instance Cat.Monoidal (LearnerType p) where
-  l1 `x` l2 = Learner {param = (param l1) `X` (param l2),
-                       impl  = \(p `X` q) (a, c)        -> ((impl l1) p a, (impl l2) q c),
-                       upd   = \(p `X` q) (a, c) (b, d) -> ((upd l1) p a b) `X` ((upd l2) q c d),
-                       req   = \(p `X` q) (a, c) (b, d) -> ((req l1) p a b, (req l2) q c d)}
+instance Cat.Monoidal (Learner p) where
+  L p1 i1 u1 r1 `x` L p2 i2 u2 r2 = L {param = p1 `X` p2,
+                                       impl  = \(p `X` q) (a, c)        -> (i1 p a, i2 q c),
+                                       upd   = \(p `X` q) (a, c) (b, d) -> (u1 p a b) `X` (u2 q c d),
+                                       req   = \(p `X` q) (a, c) (b, d) -> (r1 p a b, r2 q c d)}
 
--- No instance for Num a?
---instance Cat.Cartesian (LearnerType p) where
---  dup = Learner {param = NoP,
---                 impl  = \_ a -> (a, a),
---                 upd   = \_ _ _ -> NoP,
---                 req   = \_ a (b, c) -> b + c - a}
+-------------
 
-l1 = Learner {param = P 3,
-             impl = \(P p) a -> p * a, 
-             upd = \_ a _ -> P a, 
-             req = \(P p) _ _ -> p}
+data ParaType p n m = Para {
+  paramP :: ParamF p,
+  implP :: ImplF p n m
+}
 
-l2 = Learner {param = P 5,
-             impl = \(P p) a -> p + a, 
-             upd = \_ a _ -> P 1, 
-             req = \p _ _ -> 1}
+instance Cat.Category (ParaType p) where
+  id = Para {paramP = NoP,
+             implP  = \_ a -> a}
+ 
+  Para p2 i2 . Para p1 i1 = Para {paramP = p1 `X` p2,
+                                  implP  = \(p `X` q) a -> i2 q (i1 p a)}
+
+instance Cat.Monoidal (ParaType p) where
+  Para p1 i1 `x` Para p2 i2 = Para {paramP = p1 `X` p2,
+                                    implP  = \(p `X` q) (a, c) -> (i1 p a, i2 q c)}
+
+-------------
+
+
+functorL :: ParaType p n m -> Learner p n m
+functorL (Para p i) = L {param = p,
+                         impl  = i,
+                         upd   = undefined,
+                         req   = undefined}
+
+------------
+eps :: Double
+eps = 0.001
+
+-- alpha is defined in appendix B as a function?
+alpha :: Int -> Double
+alpha = undefined
+
+-- Loss function - has to be differentiable
+-- Authors define e as a function that takes two real numbers? 
+-- instead of as taking a more abstract type?
+type Loss b = b -> b -> Double
+
+e :: Loss b
+e = undefined
+
+-- According to the paper, this needs to be multiplied by alpha_B, which is never actually defined?
+-- The paper doesn't impose any method of calculating the derivative of a composition of functions for a Learner.
+-- What is the best way to calcualate those derivatives dynamically?
+-- How can this be combined with the automatic differentiation approach?
+costFn :: ImplF p a b -> Loss b -> (Param p) -> [(a, b)] -> Double
+costFn i loss p abs = sum $ map (\(a, b) -> e (i p a) b) abs
+
+--costFnDeriv :: 
+
+-------------
+
+l1 = L {param = P 3,
+        impl = \(P p) a -> p * a, 
+        upd = \_ a _ -> P a, 
+        req = \(P p) _ _ -> p} 
+
+l2 = L {param = P 5,
+        impl = \(P p) a -> p + a, 
+        upd = \_ a _ -> P 1, 
+        req = \p _ _ -> 1}
 
 lSerial = l2 Cat.. l1
 lParallel = l2 `Cat.x` l1
 
-f :: LearnerType p a b -> a -> b
+f :: Learner p a b -> a -> b
 f l a = (impl l) (param l) a
 
-df :: LearnerType p a b -> a -> b -> (Param p)
+df :: Learner p a b -> a -> b -> (Param p)
 df l a b = (upd l) (param l) a b
 
 outSerial = f lSerial 2
