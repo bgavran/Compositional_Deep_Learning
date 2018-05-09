@@ -7,21 +7,16 @@
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE UndecidableInstances #-}
 
+import Numeric.LinearAlgebra.Array
+import Numeric.LinearAlgebra.Array.Util
 import qualified CategoricDefinitions as Cat
 
 ----------------
 
-instance Cat.Category (->) where
-  id    = \a -> a
-  g . f = \a -> g (f a)
-
-instance Cat.Monoidal (->) where
-  f `x` g = \(a, b) -> (f a, g b)
-
-instance Cat.Cartesian (->) where
-  exl = \(a, _) -> a
-  exr = \(_, b) -> b
-  dup = \a -> (a, a)
+instance Num a => Cat.NumCat (->) a where
+  negateC = negate
+  addC = uncurry (+)
+  mulC = uncurry (*)
 
 ----------------
 
@@ -33,7 +28,7 @@ linearD :: (a -> b) -> (a `k` b) -> GD k a b
 linearD f f' = D $ \a -> (f a, f')
 
 instance Cat.Category k => Cat.Category (GD k) where
-  type Allowed (GD k) = Cat.Allowed k
+  type Allowed (GD k) a = Cat.Allowed k a
   id      = linearD Cat.id Cat.id
   (D g) . (D f)   = D $ \a -> let (b, f') = f a
                                   (c, g') = g b
@@ -55,27 +50,89 @@ instance Cat.Cartesian k => Cat.Cartesian (GD k) where
 --  inr = linearD inrF Cat.inr
 --  jam = linearD jamF Cat.jam
 
+-- There seems to be too many constraints here, but it doesn't work otherwise?
+--instance (Cat.Monoidal k,
+--          Cat.Cocartesian k, 
+--          Cat.Scalable k a, 
+--          Cat.NumCat k a, 
+--          Cat.Allowed k a,
+--          Cat.Allowed k (a, a),
+--          Num a) => Cat.NumCat (GD k) a where
+--  negateC = linearD Cat.negateC Cat.negateC
+--  addC = linearD Cat.addC Cat.addC
+--  mulC = D $ \(a, b) -> (a * b, Cat.scale b \/ Cat.scale a)
+
+
+
 type TriangleAllowed k a c d = (Cat.Allowed k a, 
                                 Cat.Allowed k c,
                                 Cat.Allowed k d,
                                 Cat.Allowed k (a, a),
                                 Cat.Allowed k (c, d))
 
-(/\) :: (TriangleAllowed k a c d, 
-         Cat.Cartesian k) => (a `k` c) -> (a `k` d) -> (a `k` (c, d))
-f /\ g = (f `Cat.x` g) Cat.. Cat.dup
-
 (\/) :: (TriangleAllowed k a c d,        
          Cat.Monoidal k, 
          Cat.Cocartesian k) => (c `k` a) -> (d `k` a) -> ((c, d) `k` a)
 f \/ g = Cat.jam Cat.. (f `Cat.x` g)
+
+(/\) :: (TriangleAllowed k a c d, 
+         Cat.Cartesian k) => (a `k` c) -> (a `k` d) -> (a `k` (c, d))
+f /\ g = (f `Cat.x` g) Cat.. Cat.dup
+
+
+
+(#*) :: NArray None Double -> NArray None Double -> NArray None Double
+(#*) = (*)
+
+(#+) :: NArray None Double -> NArray None Double -> NArray None Double
+(#+) = (+)
+
+oMul = D $ \(a, b) -> (a #* b, \(da, db) -> da #* b #+ db #* a) 
+
+oId  = D $ \a -> (a, id)
+
+d = oId /\ oId
+
+deval = eval d
+
+f1 = oMul Cat.. d
+
+fn = eval f1
+
+t = fn 3
+v = fst t
+
+g = snd t
+
+--------------------
+
+ds # cs = listArray ds cs :: Array Double
+
+sh x = putStr . formatFixed 2 $ x
+
+a = [2, 3] # [1..] ! "ij"
+b = [3, 5] # [10..] ! "jk"
+
+c = a * b
+
+-- Assumes single-letter index names
+onesLike c = let d  = map iDim $ dims c
+                 ch = concat $ map iName $ dims c
+             in d # (repeat 1) ! ch
+
+aGrad = (onesLike c) * b
+bGrad = (onesLike c) * a
+
+---------------
+
+
 
 ---
 
 newtype a ->+ b = AddFun (a -> b)
 
 instance Cat.Category (->+) where
-  type Allowed (->+) = Num
+  type Allowed (->+) a = Num a -- Should be Additive
   id = AddFun id
   (AddFun g) . (AddFun f) = AddFun (g . f)
 
@@ -88,48 +145,30 @@ instance Cat.Cartesian (->+) where
   dup = AddFun Cat.dup
 
 instance Cat.Cocartesian (->+) where
-  inl = AddFun inlF
-  inr = AddFun inrF
-  jam = AddFun jamF
+  inl = AddFun Cat.inlF
+  inr = AddFun Cat.inrF
+  jam = AddFun Cat.jamF
 
-inlF :: Num b => a -> (a, b)
-inrF :: Num a => b -> (a, b)
-jamF :: Num a => (a, a) -> a
-
-inlF = \a -> (a, 0)
-inrF = \b -> (0, b)
-jamF = \(a, b) -> a + b
+instance Num a => Cat.NumCat (->+) a where
+  negateC = AddFun Cat.negateC
+  addC = AddFun Cat.addC
+  mulC = AddFun Cat.mulC
 
 instance Num a => Cat.Scalable (->+) a where
   scale a = AddFun (*a)
 
 ----------------
- 
-instance Num a => Cat.NumCat (->) a where
-  negateC = negate
-  addC = uncurry (+)
-  mulC = uncurry (*)
-
--- There seems to be too many constraints here, but it doesn't work otherwise?
-instance (Cat.Monoidal k,
-          Cat.Cocartesian k, 
-          Cat.Scalable k a, 
-          Cat.NumCat k a, 
-          Cat.Allowed k a,
-          Cat.Allowed k (a, a),
-          Num a) => Cat.NumCat (GD k) a where
-  negateC = linearD Cat.negateC Cat.negateC
-  addC = linearD Cat.addC Cat.addC
-  mulC = D $ \(a, b) -> (a * b, Cat.scale b \/ Cat.scale a)
 
 
-f :: (Cat.NumCat k a,
-      Cat.Allowed k a,
-      Cat.Allowed k (a, a),
-      Cat.Cartesian k) => k a a
-f = Cat.mulC Cat.. (Cat.id /\ Cat.id)
 
 
+
+
+
+
+
+
+-- Continuations
 
 newtype Cont k r a b = Cont ((b `k` r) -> (a `k` r))
 

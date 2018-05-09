@@ -23,9 +23,9 @@ data Learner p a b = L {
 
 instance Cat.Category (Learner p) where
   id = L {param = NoP,
-          impl  = \NoP a   -> a,
-          upd   = \NoP _ _ -> NoP,
-          req   = \NoP a _ -> a}
+          impl  = \_ a   -> a,
+          upd   = \_ _ _ -> NoP,
+          req   = \_ a _ -> a}
 
   L p2 i2 u2 r2 . L p1 i1 u1 r1 = L {param = p1 `X` p2,
                                      impl  = \(p `X` q) a   -> let b = i1 p a
@@ -90,7 +90,7 @@ e = undefined
 -- What is the best way to calcualate those derivatives dynamically?
 -- How can this be combined with the automatic differentiation approach?
 costFn :: ImplF p a b -> Loss b -> (Param p) -> [(a, b)] -> Double
-costFn i loss p abs = sum $ map (\(a, b) -> e (i p a) b) abs
+costFn i loss p = sum . map (\(a, b) -> e (i p a) b)
 
 --costFnDeriv :: 
 
