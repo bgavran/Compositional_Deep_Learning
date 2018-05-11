@@ -82,13 +82,13 @@ instance Cartesian (->) where
   exr = \(_, b) -> b
   dup = \a -> (a, a)
 
-----------
+-------------------------------------
 
-instance {-# OVERLAPPABLE #-} (Num a) => Additive a where
+instance {-# OVERLAPS #-} (Num a) => Additive a where
   zero = 0
   (^+) = (+)
 
-instance {-# OVERLAPPING #-} (Additive a, Additive b) => Additive (a, b) where
+instance {-# OVERLAPS #-} (Additive a, Additive b) => Additive (a, b) where
   zero = (zero, zero)
   (a1, b1) ^+ (a2, b2) = (a1 ^+ a2, b1 ^+ b2)
 
