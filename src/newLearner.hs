@@ -61,13 +61,13 @@ data Learner p a b = L {
 }
 
 trivialCost :: CostF b
-trivialCost = \(_, b') -> (undefined, (undefined, b'))
+trivialCost = \(b, b') -> (undefined, (b, b'))
 
 instance Cat.Category (Learner p) where
   id = L {param = NoP,
           implreq  = D $ \(_, a)  -> (a, \b -> (NoP, b)),
           upd    = \_ -> NoP,
-          cost   = undefined}
+          cost   = trivialCost}
 
   L p2 ir2 u2 c2 . L p1 ir1 u1 c1 = L {param = p1 `X` p2,
                                        implreq  = D $ \(p `X` q, a)   -> let (b, f')  = eval ir1 (p, a)
