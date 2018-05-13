@@ -94,6 +94,8 @@ instance {-# OVERLAPS #-} (Additive a, Additive b) => Additive (a, b) where
 
 -------------------------------------
 
+-- This isn't really used anymore?
+
 inlF :: Additive b => a -> (a, b)
 inrF :: Additive a => b -> (a, b)
 jamF :: Additive a => (a, a) -> a
