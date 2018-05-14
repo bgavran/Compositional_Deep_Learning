@@ -3,8 +3,8 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleInstances #-}
 
---import Numeric.LinearAlgebra.Array
---import Numeric.LinearAlgebra.Array.Util
+import Numeric.LinearAlgebra.Array
+import Numeric.LinearAlgebra.Array.Util
 import qualified CategoricDefinitions as Cat
 import Control.Monad
 
@@ -120,6 +120,8 @@ instance Cat.Monoidal (Learner p) where
                                                                            (c, (cTrue', cPred')) = c2 (c, c')
                                                                        in ((b, c), ((bTrue', cTrue'), (bPred', cPred')))}
 
+--------------------------------
+
 sgd :: (Num p, Fractional p) => p -> p -> p
 sgd p pGrad = p - 0.001 * pGrad
 
@@ -134,15 +136,19 @@ trivialCost = \(b, b') -> (undefined, (b, b'))
 add :: Cat.Additive a => D (a, a) a
 add = Cat.jam
 
-mul :: D (Double, Double) Double
+zadd :: Num a => D (Z a, a) a
+zadd = let m = D $ \(P a, b) -> (a + b, D $ \dm -> ((P dm, dm), m))
+       in m
+
+mul :: Num a => D (a, a) a
 mul = let m = D $ \(a, b) -> (a * b, D $ \dm -> ((dm * b, dm * a), m))
       in m
 
-zmul :: D (Z Double, Double) Double
+zmul :: Num a => D (Z a, a) a
 zmul = let m = D $ \(P a, b) -> (a * b, D $ \dm -> ((P $ dm * b, dm * a), m))
        in m
 
-sigm :: D Double Double
+sigm :: Floating a => D a a
 sigm = let sFn x = 1 / (1 + exp (-x))
            s = D $ \a -> (sFn a, D $ \dm -> (dm * (sFn a) * (1 - sFn a), s))
        in s
@@ -150,10 +156,13 @@ sigm = let sFn x = 1 / (1 + exp (-x))
 paraFnMul :: Para Double Double Double
 paraFnMul = Para zmul
 
+paraFnAdd :: Para Double Double Double
+paraFnAdd = Para zadd
+
 -- This is basically a functor from Para -> Learn. Except we need to fix cost and update functions.
 functorL :: Para p a b -> (p -> p -> p) -> CostF b -> Learner p a b
 functorL para u c = L {
-  param = undefined :: ZF p, -- initialized randomly in the shape of param?
+  param = undefined, -- initialized randomly in the shape of param?
   implreq = para,
   upd = \(p, pGrad) -> u <$> p <*> pGrad, -- just applying the update fn recursively to the param data stucture
   cost = c
@@ -161,26 +170,14 @@ functorL para u c = L {
 
 l1 = functorL paraFnMul sgd trivialCost
 
---
---l1 = L {
---  param = P (2 :: Double),
---  implreq = D $ \(P p, a) -> (a * p, \b' -> (P (a * b'), b' * p)),
---  upd = \(p, pGrad) -> sgd <$> p <*> pGrad, 
---  cost = trivialCost
---}
---
---l2 = L {
---  param = P (3 :: Double),
---  implreq = D $ \(P p, a) -> (a + p, \b' -> (P b', b')),
---  upd = \(p, pGrad) -> sgd <$> p <*> pGrad,
---  cost = \(c, c') -> ((c - c')^2, let v = 2 *(c - c')
---                                  in (v, -v))
---}
---
---l3 = l2 Cat.. l1
---
---l4 = l2 `Cat.x` l1
---
+l2 = functorL paraFnAdd sgd sqrError
+
+l3 = l2 Cat.. l1
+
+l4 = l2 `Cat.x` l1
+
+fn d v = fst $ eval d v
+
 --ir :: Learner p a b -> a -> (b, b -> (Z p, a))
 --ir l a = (eval $ implreq l) (param l, a)
 --
@@ -197,24 +194,24 @@ l1 = functorL paraFnMul sgd trivialCost
 --updateLearner l = let pGrad = fst $ (learnerGrad l) 1 
 --                  in l {param = (upd l) (param l, pGrad) }
 --
------ Tensor manipulations
---
-----ds # cs = listArray ds cs :: Array Double
-----
-----sh x = putStr . formatFixed 2 $ x
-----
-----p1 = [2, 3] # [0.1, 0.1..] ! "ij"
-----p2 = [3, 5] # [0.01, 0.01..] ! "jk"
-----
-----c = p1 * p2
-----
------- Assumes single-letter index names
-----onesLike c = let d  = map iDim $ dims c
-----                 ch = concat $ map iName $ dims c
-----             in d # (repeat 1) ! ch
-----
-----p1Grad = (onesLike c) * p2
-----p2Grad = (onesLike c) * p1
+-- Tensor manipulations
+
+ds # cs = listArray ds cs :: Array Double
+
+sh x = putStr . formatFixed 2 $ x
+
+p1 = [2, 3] # [0.1, 0.1..] ! "ij"
+p2 = [3, 5] # [0.01, 0.01..] ! "jk"
+
+c = p1 * p2
+
+-- Assumes single-letter index names
+onesLike c = let d  = map iDim $ dims c
+                 ch = concat $ map iName $ dims c
+             in d # (repeat 1) ! ch
+
+p1Grad = (onesLike c) * p2
+p2Grad = (onesLike c) * p1
 --
 ----lT1 = L {
 ----  param = P p1,
