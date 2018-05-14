@@ -24,7 +24,6 @@ instance Applicative Z where
   
 --------------------------------
 
-
 newtype D a b = D {
   eval :: a -> (b, D b a) -- D b a is here instead of b -> a because sometimes we'd like to have higher order gradients
 }
@@ -57,12 +56,12 @@ newtype Para p a b = Para {
   evalPara :: D (Z p, a) b
 }
 
+-- Parametrized function D (Z p, a) b is fundamentally different than just D a b?
+--eval :: Z p -> a -> a -> (b, D b (Z p -> a -> a)) -- perhaps currying can be used here to make the code just below more elegant?
+
 instance Cat.Category (Para p) where
   id = let f = D $ \(_, a) -> (a, D $ \b' -> ((NoP, b'), f))
        in Para f
-  --(Para dg) . (Para df) = let ef = eval 
-  --                            h = dg Cat.. df
-  --                        in Para h -- D (Z p, a) c
   (Para dg) . (Para df) = let h = D $ \(p `X` q, a) -> let (b, f') = eval df (p, a)
                                                            (c, g') = eval dg (q, b)
                                                        in (c, D $ \c' -> let ((q', b'), g'') = eval g' c'
@@ -70,35 +69,18 @@ instance Cat.Category (Para p) where
                                                                          in ((p' `X` q', a'), evalPara $ (Para g'') Cat.. (Para f'')))
                           in Para h
 
---data ParaD p a b = ParaD {
---  paraEval :: Para p a b,
---  paraGrad :: Para p b a
---}
---
---instance Cat.Category (ParaD p) where
---  id = ParaD {paraEval = Cat.id, paraGrad = Cat.id}
---  (ParaD g g') . (ParaD f f') = ParaD {
---    paraEval = g Cat.. f,
---    paraGrad = f' Cat.. g'
---  }
-
-
-
--- D (ZF p, a) b  -- differentiable parametrized function?
-
--- This is basically a functor from Para -> Learn. Except we need to fix cost and update functions.
-funct :: D (ZF p, a) b -> UpdF p -> CostF b -> Learner p a b
-funct d u c = L {
-  param = undefined :: ZF p, -- initialized randomly in the shape of param?
-  implreq = d,
-  upd = u,
-  cost = c
-}
+instance Cat.Monoidal (Para p) where
+  (Para df) `x` (Para dg) = let h = D $ \(p `X` q, (a, b)) -> let (c, f') = eval df (p, a)
+                                                                  (d, g') = eval dg (q, b)
+                                                              in ((c, d), D $ \(c', d') -> let ((p', a'), f'') = eval f' c'
+                                                                                               ((q', b'), g'') = eval g' d'
+                                                                                           in ((p' `X` q', (a', b')), evalPara $ (Para f'') `Cat.x` (Para g'')))
+                            in Para h
 
 --------------------------------
 
 type ZF p = Z p
-type ImplReqF p a b = D (Z p, a) b
+type ImplReqF p a b = Para p a b
 type UpdF p = (Z p, Z p) -> Z p
 type CostF b = (b, b) -> (b, (b, b)) -- Usually would have been instantiated as D (b, b) b, but Haskell complains about multiple instances declaration... :/
 
@@ -109,44 +91,76 @@ data Learner p a b = L {
   cost  :: CostF b
 }
 
-trivialCost :: CostF b
-trivialCost = \(b, b') -> (undefined, (b, b'))
-
 instance Cat.Category (Learner p) where
   id = L {param = NoP,
-          implreq = let f = D $ \(_, a)  -> (a, D $ \b -> ((NoP, b),  f))
-                    in f,
+          implreq = Cat.id,
           upd    = \_ -> NoP,
           cost   = trivialCost}
 
-  (.) = undefined
+  L p2 ir2' u2 c2 . L p1 ir1' u1 c1 = let ir1 = evalPara ir1'
+                                          ir2 = evalPara ir2'
+                                      in L {param = p1 `X` p2,
+                                            implreq  = let h = D $ \(p `X` q, a) -> let (b, f')  = eval ir1 (p, a)
+                                                                                        (c, g')  = eval ir2 (q, b)
+                                                                                        costGrad = \b' -> (snd . snd) $ c1 (b, b')
+                                                                                    in (c, D $ \c' -> let ((q', b'), g'') = eval g' c'
+                                                                                                          ((p', a'), f'') = ((eval f') . costGrad) b'
+                                                                                                      in ((p' `X` q', a'), evalPara $ (Para g'') Cat.. (Para f'')))
+                                                       in Para h,
+                                            upd   = \(p `X` q, pGrad `X` qGrad) -> u1 (p, pGrad) `X` u2 (q, qGrad),
+                                            cost   = c2} 
 
---  L p2 ir2 u2 c2 . L p1 ir1 u1 c1 = L {param = p1 `X` p2,
---                                       implreq  = D $ \(p `X` q, a)   -> let (b, f')  = eval ir1 (p, a)
---                                                                             (c, g')  = eval ir2 (q, b)
---                                                                             costGrad = \b' -> (snd . snd) $ c1 (b, b')
---                                                                          in (c, \c' -> let (p2, b') = g' c'
---                                                                                            (p1, a') = (f' . costGrad) b'
---                                                                                        in (p1 `X` p2, a')), 
---                                       upd   = \(p `X` q, pGrad `X` qGrad) -> u1 (p, pGrad) `X` u2 (q, qGrad),
---                                       cost   = c2} 
---
----- Is cost function a part of a learner? Cost function fits somewhere in between learners, when composing them? as part of learner composition?
---
---instance Cat.Monoidal (Learner p) where
---  L p1 ir1 u1 c1 `x` L p2 ir2 u2 c2 = L {param = p1 `X` p2,
---                                         implreq = D $ \(p `X` q, (a, c))  -> let (b, f') = eval ir1 (p, a)
---                                                                                  (d, g') = eval ir2 (q, c)
---                                                                              in ((b, d), \(b', d') -> let (p1, a') = f' b'
---                                                                                                           (p2, c') = g' d'
---                                                                                                       in (p1 `X` p2, (a', c'))),
---                                         upd = \(p `X` q, pGrad `X` qGrad) -> u1 (p, pGrad) `X` u2 (q, qGrad),
---                                         cost = \((b, c), (b', c')) -> let (b, (bTrue', bPred')) = c1 (b, b')
---                                                                           (c, (cTrue', cPred')) = c2 (c, c')
---                                                                       in ((b, c), ((bTrue', cTrue'), (bPred', cPred')))}
---
---sgd :: (Num p, Fractional p) => p -> p -> p
---sgd p pGrad = p - 0.001 * pGrad
+-- Is cost function a part of a learner? Cost function fits somewhere in between learners, when composing them? as part of learner composition?
+
+instance Cat.Monoidal (Learner p) where
+  L p1 ir1 u1 c1 `x` L p2 ir2 u2 c2 = L {param = p1 `X` p2,
+                                         implreq = ir1 `Cat.x` ir2,
+                                         upd = \(p `X` q, pGrad `X` qGrad) -> u1 (p, pGrad) `X` u2 (q, qGrad),
+                                         cost = \((b, c), (b', c')) -> let (b, (bTrue', bPred')) = c1 (b, b')
+                                                                           (c, (cTrue', cPred')) = c2 (c, c')
+                                                                       in ((b, c), ((bTrue', cTrue'), (bPred', cPred')))}
+
+sgd :: (Num p, Fractional p) => p -> p -> p
+sgd p pGrad = p - 0.001 * pGrad
+
+
+sqrError :: Num a => (a, a) -> (a, (a, a)) 
+sqrError = \(c, c') -> ((c - c')^2, let v = 2 * (c - c')
+                                    in (v, -v))
+
+trivialCost :: CostF b
+trivialCost = \(b, b') -> (undefined, (b, b'))
+
+add :: Cat.Additive a => D (a, a) a
+add = Cat.jam
+
+mul :: D (Double, Double) Double
+mul = let m = D $ \(a, b) -> (a * b, D $ \dm -> ((dm * b, dm * a), m))
+      in m
+
+zmul :: D (Z Double, Double) Double
+zmul = let m = D $ \(P a, b) -> (a * b, D $ \dm -> ((P $ dm * b, dm * a), m))
+       in m
+
+sigm :: D Double Double
+sigm = let sFn x = 1 / (1 + exp (-x))
+           s = D $ \a -> (sFn a, D $ \dm -> (dm * (sFn a) * (1 - sFn a), s))
+       in s
+
+paraFnMul :: Para Double Double Double
+paraFnMul = Para zmul
+
+-- This is basically a functor from Para -> Learn. Except we need to fix cost and update functions.
+functorL :: Para p a b -> (p -> p -> p) -> CostF b -> Learner p a b
+functorL para u c = L {
+  param = undefined :: ZF p, -- initialized randomly in the shape of param?
+  implreq = para,
+  upd = \(p, pGrad) -> u <$> p <*> pGrad, -- just applying the update fn recursively to the param data stucture
+  cost = c
+}
+
+l1 = functorL paraFnMul sgd trivialCost
+
 --
 --l1 = L {
 --  param = P (2 :: Double),
