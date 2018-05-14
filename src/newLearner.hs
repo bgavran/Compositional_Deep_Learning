@@ -56,9 +56,6 @@ newtype Para p a b = Para {
   evalPara :: D (Z p, a) b
 }
 
--- Parametrized function D (Z p, a) b is fundamentally different than just D a b?
---eval :: Z p -> a -> a -> (b, D b (Z p -> a -> a)) -- perhaps currying can be used here to make the code just below more elegant?
-
 instance Cat.Category (Para p) where
   id = let f = D $ \(_, a) -> (a, D $ \b' -> ((NoP, b'), f))
        in Para f
@@ -76,6 +73,9 @@ instance Cat.Monoidal (Para p) where
                                                                                                ((q', b'), g'') = eval g' d'
                                                                                            in ((p' `X` q', (a', b')), evalPara $ (Para f'') `Cat.x` (Para g'')))
                             in Para h
+
+-- Parametrized function D (Z p, a) b is fundamentally different than just D a b?
+--eval :: Z p -> a -> a -> (b, D b (Z p -> a -> a)) -- perhaps currying can be used here to make the code just below more elegant?
 
 --------------------------------
 
@@ -178,22 +178,6 @@ l4 = l2 `Cat.x` l1
 
 fn d v = fst $ eval d v
 
---ir :: Learner p a b -> a -> (b, b -> (Z p, a))
---ir l a = (eval $ implreq l) (param l, a)
---
---f :: Learner p a b -> a -> b
---f l a = fst $ ir l a
---
---df :: Learner p a b -> a -> (b -> (Z p, a))
---df l a = snd $ ir l a
---
---learnerGrad :: Learner Double Double Double -> Double -> (Z Double, Double)
---learnerGrad l = df l 10
---
---updateLearner :: Learner Double Double Double -> Learner Double Double Double
---updateLearner l = let pGrad = fst $ (learnerGrad l) 1 
---                  in l {param = (upd l) (param l, pGrad) }
---
 -- Tensor manipulations
 
 ds # cs = listArray ds cs :: Array Double
@@ -212,17 +196,3 @@ onesLike c = let d  = map iDim $ dims c
 
 p1Grad = (onesLike c) * p2
 p2Grad = (onesLike c) * p1
---
-----lT1 = L {
-----  param = P p1,
-----  implreq = \(P p) a -> ((a * p), (*p)),
-----  upd = undefined,
-----  cost = trivialCost
-----}
-----
-----lT2 = L {
-----  param = P p2,
-----  implreq = \(P p) a -> ((a * p), (*p)),
-----  upd = undefined,
-----  cost = \(c, c') = 
-----}
