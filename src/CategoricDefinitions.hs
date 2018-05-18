@@ -55,6 +55,7 @@ class Category k => Cocartesian k where
 
 class Additive a where
   zero :: a
+  one :: a
   (^+) :: a -> a -> a
 
 class NumCat k a where
@@ -86,10 +87,12 @@ instance Cartesian (->) where
 
 instance {-# OVERLAPS #-} (Num a) => Additive a where
   zero = 0
+  one = 1
   (^+) = (+)
 
 instance {-# OVERLAPS #-} (Additive a, Additive b) => Additive (a, b) where
   zero = (zero, zero)
+  one = (one, one)
   (a1, b1) ^+ (a2, b2) = (a1 ^+ a2, b1 ^+ b2)
 
 -------------------------------------
