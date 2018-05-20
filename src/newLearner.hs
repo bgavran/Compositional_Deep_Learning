@@ -48,7 +48,7 @@ dConstr :: ((p -> a -> prod) -> (b, DType b (p -> a -> prod))) -> DType (p -> a 
 dConstr = D
 
 newtype ParaType p a b = Para {
-  evalPara :: DType (Z p, a) b
+  evalP :: DType (Z p, a) b
 }
 
 data RType p a b 
@@ -96,30 +96,28 @@ instance Cat.Cocartesian DType where
 instance Cat.Category (ParaType p) where
   id = let f = D $ \(_, a) -> (a, D $ \b' -> ((NoP, b'), f))
        in Para f
+  (Para dg) . (Para df) = Para $ D $ \(p `X` q, a) -> let (b, f') = eval df (p, a)
+                                                          (c, g') = eval dg (q, b)
+                                                      in (c, D $ \c' -> let ((q', b'), g'') = eval g' c'
+                                                                            ((p', a'), f'') = eval f' b'
+                                                                        in ((p' `X` q', a'), evalP $ (Para g'') Cat.. (Para f'')))
 --  (Para dg) . (Para df) = let h = D $ \(p `X` q, a) -> let newF = D $ \a -> undefined -- curry (eval df) p 
 --                                                       in undefined
 --                          in Para h
-  (Para dg) . (Para df) = let h = D $ \(p `X` q, a) -> let (b, f') = eval df (p, a)
-                                                           (c, g') = eval dg (q, b)
-                                                       in (c, D $ \c' -> let ((q', b'), g'') = eval g' c'
-                                                                             ((p', a'), f'') = eval f' b'
-                                                                         in ((p' `X` q', a'), evalPara $ (Para g'') Cat.. (Para f'')))
-                          in Para h
 
 instance Cat.Monoidal (ParaType p) where
-  (Para df) `x` (Para dg) = let h = D $ \(p `X` q, (a, b)) -> let (c, f') = eval df (p, a)
-                                                                  (d, g') = eval dg (q, b)
-                                                              in ((c, d), D $ \(c', d') -> let ((p', a'), f'') = eval f' c'
-                                                                                               ((q', b'), g'') = eval g' d'
-                                                                                           in ((p' `X` q', (a', b')), evalPara $ (Para f'') `Cat.x` (Para g'')))
-                            in Para h
+  (Para df) `x` (Para dg) = Para $ D $ \(p `X` q, (a, b)) -> let (c, f') = eval df (p, a)
+                                                                 (d, g') = eval dg (q, b)
+                                                             in ((c, d), D $ \(c', d') -> let ((p', a'), f'') = eval f' c'
+                                                                                              ((q', b'), g'') = eval g' d'
+                                                                                          in ((p' `X` q', (a', b')), evalP $ (Para f'') `Cat.x` (Para g'')))
 
 ----------------------------------
 
 type ZF p = Z p
 type ImplReqF p a b = ParaType p a b
 type UpdF p = (Z p, Z p) -> Z p
-type CostF b = DType (b, b) b
+type CostF b = DType (b, b) b -- (Predicted, True) - first is the output of the ir function, second one comes from learner 2
 
 data Learner p a b = L {
   param :: ZF p,
@@ -128,75 +126,48 @@ data Learner p a b = L {
   cost  :: CostF b
 }
 
-costGradOut :: Cat.Additive b => CostF b -> b -> b -> b
-costGradOut = \c1 b b' -> snd $ f (dfD c1 (b, b')) Cat.one
-
-test :: Cat.Additive a => a -> a
-test = costGradOut add Cat.one
-
 instance Cat.Category (Learner p) where
   type Allowed (Learner p) x = Cat.Additive x
   id = L {param = NoP,
           implreq = Cat.id,
           upd    = \_ -> NoP,
           cost   = trivialCost}
-
---cost :: (b, b) -> (b, (b, b))
  
-  L p2 ir2' u2 c2 . L p1 ir1' u1 c1 = let ir1 = evalPara ir1'
-                                          ir2 = evalPara ir2'
-                                      in L {param = p1 `X` p2,
-                                            implreq  = let h = D $ \(p `X` q, a) -> let (b, f')  = eval ir1 (p, a) 
-                                                                                        (c, g')  = eval ir2 (q, b)
-                                                                                        costGrad = \b' -> costGradOut c1 b b'
-                                                                                    in (c, D $ \c' -> let ((q', b'), g'') = eval g' c'
-                                                                                                          ((p', a'), f'') = ((eval f') . costGrad) b'
-                                                                                                      in ((p' `X` q', a'), evalPara $ (Para g'') Cat.. (Para f'')))
-                                                       in Para h,
-                                            upd   = \(p `X` q, pGrad `X` qGrad) -> u1 (p, pGrad) `X` u2 (q, qGrad),
-                                            cost   = c2} 
+  L p2 ir2' u2 c2 . L p1 ir1' u1 c1 = L {param = p1 `X` p2,
+                                        implreq  = Para $ D $ \(p `X` q, a) -> let ir1 = evalP ir1'
+                                                                                   ir2 = evalP ir2'
+                                                                                   (b, f')  = eval ir1 (p, a) 
+                                                                                   (c, g')  = eval ir2 (q, b)
+                                                                                   costGrad = \b' -> snd $ f (dfD c1 (b, b')) Cat.one
+                                                                               in (c, D $ \c' -> let ((q', b'), g'') = eval g' c'
+                                                                                                     ((p', a'), f'') = ((eval f') . costGrad) b'
+                                                                                                 in ((p' `X` q', a'), evalP $ (Para g'') Cat.. (Para f''))),
+                                        upd   = \(p `X` q, pGrad `X` qGrad) -> u1 (p, pGrad) `X` u2 (q, qGrad),
+                                        cost   = c2} 
 
 ------ Is cost function a part of a learner? Cost function fits somewhere in between learners, when composing them? as part of learner composition?
 
---instance Cat.Monoidal (Learner p) where
---  L p1 ir1 u1 c1 `x` L p2 ir2 u2 c2 = L {param = p1 `X` p2,
---                                         implreq = ir1 `Cat.x` ir2,
---                                         upd = \(p `X` q, pGrad `X` qGrad) -> u1 (p, pGrad) `X` u2 (q, qGrad),
---                                        -- cost = c1 `X` c2
---                                         cost = \((b, c), (b', c')) -> let (b, (bTrue', bPred')) = c1 (b, b')
---                                                                           (c, (cTrue', cPred')) = c2 (c, c')
---                                                                       in ((b, c), ((bTrue', cTrue'), (bPred', cPred')))
---}
+instance Cat.Monoidal (Learner p) where
+  L p1 ir1 u1 c1 `x` L p2 ir2 u2 c2 = L {param = p1 `X` p2,
+                                         implreq = ir1 `Cat.x` ir2,
+                                         upd = \(p `X` q, pGrad `X` qGrad) -> u1 (p, pGrad) `X` u2 (q, qGrad),
+                                         cost = D $ \((b, c), (b', c')) -> let (c1V, D c1') = eval c1 (b, b')
+                                                                               (c2V, D c2') = eval c2 (c, c')
+                                                                           in ((c1V, c2V), D $ \(c1V', c2V') -> let ((bP', bT'), c1'') = c1' c1V'
+                                                                                                                    ((cP', cT'), c2'') = c2' c2V'
+                                                                                                                in (((bP', cP'), (bT', cT')), undefined))
+}
 
-
-ir1 :: DType (Z p, a) b
-ir1 = undefined
-
-p = P 3
-a = 4
-
-f'fn :: Z p -> a -> DType b (Z p, a)
-f'fn p a = snd $ eval ir1 (p, a)
-
-f' = f'fn p a
-
-newimpl :: DType (Z p, b) c -> DType (Z p, a) b -> ImplReqF p a c
-newimpl ir2 ir1 = let h = D $ \(p `X` q, a) -> let (b, f') = eval ir1 (p, a) 
-                                                   (c, g') = eval ir2 (q, b)
-                                                   costGrad = undefined
-                                               in (c, D $ \c' -> let ((q', b'), g'') = eval g' c'
-                                                                     ((p', a'), f'') = ((eval f') . costGrad) b'
-                                                                 in ((p' `X` q', a'), evalPara $ (Para g'') Cat.. (Para f'')))
-                  in Para h
 ------------------------------------
 
 sgd :: (Num p, Fractional p) => p -> p -> p
 sgd p pGrad = p - 0.001 * pGrad
 
+sqr :: (Cat.Additive a, Num a) => DType a a
+sqr = mul Cat.. Cat.dup
 
-sqrError :: Num a => (a, a) -> (a, (a, a)) 
-sqrError = \(c, c') -> ((c - c')^2, let v = 2 * (c - c')
-                                    in (v, -v))
+sqrError :: (Cat.Additive a, Num a) => DType (a, a) a
+sqrError = sqr Cat.. add Cat.. (Cat.id `Cat.x` scale (-1))
 
 trivialCost :: CostF b
 trivialCost = D $ \(b, b') -> (undefined, D $ \_ -> ((b, b'), undefined))
@@ -211,22 +182,25 @@ add = Cat.jam
 zadd :: Num a => DType (Z a, a) a
 zadd = D $ \(P a, b) -> (a + b, D $ \dm -> ((P dm, dm), undefined))
 
-mul :: Num a => DType (a, a) a
-mul = D $ \(a, b) -> (a * b, D $ \dm -> ((dm * b, dm * a), undefined))
+mul :: (Cat.Additive a, Num a) => DType (a, a) a
+mul = D $ \(a, b) -> (a * b, (scale b `Cat.x` scale a) Cat.. Cat.dup)
 
 zmul :: Num a => DType (Z a, a) a
 zmul = D $ \(P a, b) -> (a * b, D $ \dm -> ((P $ dm * b, dm * a), undefined))
 
-something :: Double -> DType Double Double
+something :: (Cat.Additive a, Num a) => a -> DType a a
 something k = D $ \dm -> (k * dm, zeroD)
 
-scale :: Double -> DType Double Double
+scale :: (Cat.Additive a, Num a) => a -> DType a a
 scale k = D $ \a -> let f = (*k) 
                     in (f a, something k)
               
-sigm :: Floating a => DType a a
-sigm = D $ \a -> let s = 1 / (1 + exp (-a))
-                 in (s, D $ \dm -> (dm * s * (1 - s), undefined))
+sigm :: (Cat.Additive a, Floating a) => DType a a
+sigm = let z = D $ \a -> let s = 1 / (1 + exp (-a))
+                         in (s, undefined)
+       in z
+
+--D $ \dm -> (dm * s * (1 - s), undefined))
 
 mm :: DType Double Double
 mm = scale 4
@@ -237,9 +211,12 @@ f op v = fst $ eval op v
 dfD :: DType a b -> a -> DType b a
 dfD op v = snd $ eval op v 
 
-df :: Cat.Additive a => Int -> DType a a -> a -> a
-df 0 op v = f op Cat.one
-df n op v = df (n - 1) (dfD op v) Cat.one
+df :: Cat.Additive b => DType a b -> a -> a
+df op v = f (dfD op v) Cat.one
+
+dfn :: Cat.Additive a => Int -> DType a a -> a -> a
+dfn 0 op v = f op Cat.one
+dfn n op v = dfn (n - 1) (dfD op v) Cat.one
 
 paraFnMul :: ParaType Double Double Double
 paraFnMul = Para zmul
@@ -248,37 +225,37 @@ paraFnAdd :: ParaType Double Double Double
 paraFnAdd = Para zadd
 
 ---- This is basically a functor from Para -> Learn. Except we need to fix cost and update functions.
---functorL :: Para p a b -> (p -> p -> p) -> CostF b -> Learner p a b
---functorL para u c = L {
---  param = undefined, -- initialized randomly in the shape of param?
---  implreq = para,
---  upd = \(p, pGrad) -> u <$> p <*> pGrad, -- just applying the update fn recursively to the param data stucture
---  cost = c
---}
---
---l1 = functorL paraFnMul sgd trivialCost
---
---l2 = functorL paraFnAdd sgd sqrError
---
---l3 = l2 Cat.. l1
---
---l4 = l2 `Cat.x` l1
---
----- Tensor manipulations
---
---ds # cs = listArray ds cs :: Array Double
---
---sh x = putStr . formatFixed 2 $ x
---
---p1 = [2, 3] # [0.1, 0.1..] ! "ij"
---p2 = [3, 5] # [0.01, 0.01..] ! "jk"
---
---c = p1 * p2
---
----- Assumes single-letter index names
---onesLike c = let d  = map iDim $ dims c
---                 ch = concat $ map iName $ dims c
---             in d # (repeat 1) ! ch
---
---p1Grad = (onesLike c) * p2
---p2Grad = (onesLike c) * p1
+functorL :: ParaType p a b -> (p -> p -> p) -> CostF b -> Learner p a b
+functorL para u c = L {
+  param = undefined, -- initialized randomly in the shape of param?
+  implreq = para,
+  upd = \(p, pGrad) -> u <$> p <*> pGrad, -- just applying the update fn recursively to the param data stucture
+  cost = c
+}
+
+l1 = functorL paraFnMul sgd trivialCost
+
+l2 = functorL paraFnAdd sgd sqrError
+
+l3 = l2 Cat.. l1
+
+l4 = l2 `Cat.x` l1
+
+-- Tensor manipulations
+
+ds # cs = listArray ds cs :: Array Double
+
+sh x = putStr . formatFixed 2 $ x
+
+p1 = [2, 3] # [0.1, 0.1..] ! "ij"
+p2 = [3, 5] # [0.01, 0.01..] ! "jk"
+
+c = p1 * p2
+
+-- Assumes single-letter index names
+onesLike c = let d  = map iDim $ dims c
+                 ch = concat $ map iName $ dims c
+             in d # (repeat 1) ! ch
+
+p1Grad = (onesLike c) * p2
+p2Grad = (onesLike c) * p1
