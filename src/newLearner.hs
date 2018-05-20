@@ -1,7 +1,23 @@
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE 
+             EmptyCase,
+             FlexibleContexts,
+             FlexibleInstances,
+             InstanceSigs,
+             MultiParamTypeClasses,
+             LambdaCase,
+             MultiWayIf,
+             NamedFieldPuns,
+             TupleSections,
+             DeriveFunctor,
+             TypeOperators,
+             ScopedTypeVariables,
+             ConstraintKinds,
+             RankNTypes,
+             NoMonomorphismRestriction
+
+                            #-}
+
 
 import Numeric.LinearAlgebra.Array
 import Numeric.LinearAlgebra.Array.Util
@@ -63,18 +79,18 @@ instance Cat.Cocartesian DType where
 
 ----------------------------------
 
-a :: DType Double Double
-a = scale 3
-
-b :: Num a => DType (a -> b) b
-b = D $ \f -> (f 2, undefined)
-
-c :: Cat.Additive a => DType (DType a b) b
-c = D $ \dType -> let val = Cat.one
-                  in (f dType val, undefined) -- how to differentiate w.r.t a function? 
-
-pp :: Num a => DType (Z a, a) a
-pp = D $ \(P a, b) -> (a * b, D $ \dm -> ((P $ dm * b, dm * a), undefined))
+--a :: DType Double Double
+--a = scale 3
+--
+--b :: Num a => DType (a -> b) b
+--b = D $ \f -> (f 2, undefined)
+--
+--c :: Cat.Additive a => DType (DType a b) b
+--c = D $ \dType -> let val = Cat.one
+--                  in (f dType val, undefined) -- how to differentiate w.r.t a function? 
+--
+--pp :: Num a => DType (Z a, a) a
+--pp = D $ \(P a, b) -> (a * b, D $ \dm -> ((P $ dm * b, dm * a), undefined))
 
 
 instance Cat.Category (ParaType p) where
@@ -112,7 +128,14 @@ data Learner p a b = L {
   cost  :: CostF b
 }
 
+costGradOut :: Cat.Additive b => CostF b -> b -> b -> b
+costGradOut = \c1 b b' -> snd $ f (dfD c1 (b, b')) Cat.one
+
+test :: Cat.Additive a => a -> a
+test = costGradOut add Cat.one
+
 instance Cat.Category (Learner p) where
+  type Allowed (Learner p) x = Cat.Additive x
   id = L {param = NoP,
           implreq = Cat.id,
           upd    = \_ -> NoP,
@@ -120,20 +143,18 @@ instance Cat.Category (Learner p) where
 
 --cost :: (b, b) -> (b, (b, b))
  
---  L p2 ir2' u2 c2 . L p1 ir1' u1 c1 = let ir1 = evalPara ir1'
---                                          ir2 = evalPara ir2'
---                                      in L {param = p1 `X` p2,
---                                            implreq  = let h = D $ \(p `X` q, a) -> let (b, f')  = eval ir1 (p, a)
---                                                                                        (c, g')  = eval ir2 (q, b)
---                                                                                        costGrad = \b' -> snd $ df 1 c1 (b, b')
---                                                                                        --costGrad = \b' -> snd $ f (dfD c1 (b, b')) Cat.one
---                                                                                        --costGrad = \b' -> (snd . snd) $ c1 (b, b')
---                                                                                    in (c, D $ \c' -> let ((q', b'), g'') = eval g' c'
---                                                                                                          ((p', a'), f'') = ((eval f') . costGrad) b'
---                                                                                                      in ((p' `X` q', a'), evalPara $ (Para g'') Cat.. (Para f'')))
---                                                       in Para h,
---                                            upd   = \(p `X` q, pGrad `X` qGrad) -> u1 (p, pGrad) `X` u2 (q, qGrad),
---                                            cost   = c2} 
+  L p2 ir2' u2 c2 . L p1 ir1' u1 c1 = let ir1 = evalPara ir1'
+                                          ir2 = evalPara ir2'
+                                      in L {param = p1 `X` p2,
+                                            implreq  = let h = D $ \(p `X` q, a) -> let (b, f')  = eval ir1 (p, a) 
+                                                                                        (c, g')  = eval ir2 (q, b)
+                                                                                        costGrad = \b' -> costGradOut c1 b b'
+                                                                                    in (c, D $ \c' -> let ((q', b'), g'') = eval g' c'
+                                                                                                          ((p', a'), f'') = ((eval f') . costGrad) b'
+                                                                                                      in ((p' `X` q', a'), evalPara $ (Para g'') Cat.. (Para f'')))
+                                                       in Para h,
+                                            upd   = \(p `X` q, pGrad `X` qGrad) -> u1 (p, pGrad) `X` u2 (q, qGrad),
+                                            cost   = c2} 
 
 ------ Is cost function a part of a learner? Cost function fits somewhere in between learners, when composing them? as part of learner composition?
 
@@ -146,6 +167,27 @@ instance Cat.Category (Learner p) where
 --                                                                           (c, (cTrue', cPred')) = c2 (c, c')
 --                                                                       in ((b, c), ((bTrue', cTrue'), (bPred', cPred')))
 --}
+
+
+ir1 :: DType (Z p, a) b
+ir1 = undefined
+
+p = P 3
+a = 4
+
+f'fn :: Z p -> a -> DType b (Z p, a)
+f'fn p a = snd $ eval ir1 (p, a)
+
+f' = f'fn p a
+
+newimpl :: DType (Z p, b) c -> DType (Z p, a) b -> ImplReqF p a c
+newimpl ir2 ir1 = let h = D $ \(p `X` q, a) -> let (b, f') = eval ir1 (p, a) 
+                                                   (c, g') = eval ir2 (q, b)
+                                                   costGrad = undefined
+                                               in (c, D $ \c' -> let ((q', b'), g'') = eval g' c'
+                                                                     ((p', a'), f'') = ((eval f') . costGrad) b'
+                                                                 in ((p' `X` q', a'), evalPara $ (Para g'') Cat.. (Para f'')))
+                  in Para h
 ------------------------------------
 
 sgd :: (Num p, Fractional p) => p -> p -> p
