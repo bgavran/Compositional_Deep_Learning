@@ -69,7 +69,6 @@ class Scalable k a where
 -------------------------------------
 -- Instances
 -------------------------------------
---
 
 instance Category (->) where
   id    = \a -> a

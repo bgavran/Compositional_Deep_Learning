@@ -1,4 +1,3 @@
-{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE 
              EmptyCase,
              FlexibleContexts,
@@ -14,8 +13,8 @@
              ScopedTypeVariables,
              ConstraintKinds,
              RankNTypes,
-             NoMonomorphismRestriction
-
+             NoMonomorphismRestriction,
+             TypeFamilies 
                             #-}
 
 
@@ -76,6 +75,16 @@ instance Cat.Cocartesian DType where
   inl = D $ \a -> ((a, Cat.zero), Cat.exl)
   inr = D $ \b -> ((Cat.zero, b), Cat.exr)
   jam = D $ \(a, b) -> (a Cat.^+ b, Cat.dup)
+
+
+type AdditiveABC a b c = (Cat.Additive a, Cat.Additive b, Cat.Additive c)
+
+-- The type annotation can be even more general, but that's not needed for now.
+(/\) :: AdditiveABC a b c => DType a b -> DType a c -> DType a (b, c)
+f /\ g = (f `Cat.x` g) Cat.. Cat.dup 
+
+(\/) :: AdditiveABC a b c => DType a c -> DType b c -> DType (a, b) c
+f \/ g = Cat.jam Cat.. (f `Cat.x` g)
 
 ----------------------------------
 
@@ -199,7 +208,6 @@ sigm :: (Cat.Additive a, Floating a) => DType a a
 sigm = let z = D $ \a -> let s = 1 / (1 + exp (-a))
                          in (s, undefined)
        in z
-
 --D $ \dm -> (dm * s * (1 - s), undefined))
 
 mm :: DType Double Double
