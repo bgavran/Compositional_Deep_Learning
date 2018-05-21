@@ -51,6 +51,11 @@ class Category k => Cocartesian k where
   jam :: (Allowed k a,
           Allowed k (a, a)) => (a, a) `k` a
 
+class Cartesian k => Closed k where
+  apply :: (a -> b, a) `k` b
+  curry :: ((a, b) `k` c) -> a `k` (b -> c)
+  uncurry :: a `k` (b -> c) -> (a, b) `k` c
+
 --------------------------------------
 
 class Additive a where
@@ -81,6 +86,11 @@ instance Cartesian (->) where
   exl = \(a, _) -> a
   exr = \(_, b) -> b
   dup = \a -> (a, a)
+
+instance Closed (->) where
+  apply (f, a) = f a
+  curry f      = \a b -> f (a, b)
+  uncurry f    = \(a, b) -> f a b
 
 -------------------------------------
 

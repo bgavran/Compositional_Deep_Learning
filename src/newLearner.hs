@@ -76,6 +76,45 @@ instance Cat.Cocartesian DType where
   inr = D $ \b -> ((Cat.zero, b), Cat.exr)
   jam = D $ \(a, b) -> (a Cat.^+ b, Cat.dup)
 
+instance Cat.Closed DType where
+  apply :: DType (a -> b, a) b
+  apply = D $ \(f, a) -> (f a, applyGrad)
+  
+  curry :: DType (a, b) c -> DType a (b -> c)
+  curry (D fTuple) = D $ \a -> (\b -> fst $ fTuple (a, b) , bcA)
+
+  uncurry :: DType a (b -> c) -> DType (a, b) c
+  uncurry (D fCurry)= D $ \(a, b) -> (fst (fCurry a) b, cBA)
+
+  --uncurrying might be possible with recursive DTypes?
+
+----------
+
+c :: DType (DType a b, a) b
+c = D $ \(dType, a) -> (f dType a, D $ \b' -> ((undefined, f (dfD dType a) b'), undefined))
+--                                 D :: b (DType a b, a)
+
+unc :: DType a (DType b c) -> DType (a, b) c
+unc dFCurry = D $ \(a, b) -> (f (f dFCurry a) b, undefined)
+--                                               D :: c (a, b)
+
+----------
+
+applyGrad :: DType b (a -> b, a)
+applyGrad = D $ \b -> ((\a -> undefined, undefined), undefined)
+
+fCurry :: a -> (DType b c, DType (DType b c) a)
+fCurry = undefined
+
+bcA :: DType (b -> c) a
+bcA = undefined
+
+cBA :: DType c (b, a)
+cBA = undefined
+
+fTuple :: (a, b) -> (c, DType c (a, b))
+fTuple = undefined
+
 
 type AdditiveABC a b c = (Cat.Additive a, Cat.Additive b, Cat.Additive c)
 
@@ -87,20 +126,6 @@ f /\ g = (f `Cat.x` g) Cat.. Cat.dup
 f \/ g = Cat.jam Cat.. (f `Cat.x` g)
 
 ----------------------------------
-
---a :: DType Double Double
---a = scale 3
---
---b :: Num a => DType (a -> b) b
---b = D $ \f -> (f 2, undefined)
---
---c :: Cat.Additive a => DType (DType a b) b
---c = D $ \dType -> let val = Cat.one
---                  in (f dType val, undefined) -- how to differentiate w.r.t a function? 
---
---pp :: Num a => DType (Z a, a) a
---pp = D $ \(P a, b) -> (a * b, D $ \dm -> ((P $ dm * b, dm * a), undefined))
-
 
 instance Cat.Category (ParaType p) where
   id = let f = D $ \(_, a) -> (a, D $ \b' -> ((NoP, b'), f))
@@ -176,14 +201,13 @@ sqr :: (Cat.Additive a, Num a) => DType a a
 sqr = mul Cat.. Cat.dup
 
 sqrError :: (Cat.Additive a, Num a) => DType (a, a) a
-sqrError = sqr Cat.. add Cat.. (Cat.id `Cat.x` scale (-1))
+sqrError = sqr Cat.. (Cat.id \/ scale (-1))
 
 trivialCost :: CostF b
 trivialCost = D $ \(b, b') -> (undefined, D $ \_ -> ((b, b'), undefined))
 
 zeroD :: Cat.Additive a => DType a a
-zeroD = let z = D $ \_ -> (Cat.zero, z)
-        in z
+zeroD = D $ \_ -> (Cat.zero, zeroD)
 
 add :: Cat.Additive a => DType (a, a) a
 add = Cat.jam
@@ -192,7 +216,7 @@ zadd :: Num a => DType (Z a, a) a
 zadd = D $ \(P a, b) -> (a + b, D $ \dm -> ((P dm, dm), undefined))
 
 mul :: (Cat.Additive a, Num a) => DType (a, a) a
-mul = D $ \(a, b) -> (a * b, (scale b `Cat.x` scale a) Cat.. Cat.dup)
+mul = D $ \(a, b) -> (a * b, scale b /\ scale a)
 
 zmul :: Num a => DType (Z a, a) a
 zmul = D $ \(P a, b) -> (a * b, D $ \dm -> ((P $ dm * b, dm * a), undefined))
@@ -205,9 +229,8 @@ scale k = D $ \a -> let f = (*k)
                     in (f a, something k)
               
 sigm :: (Cat.Additive a, Floating a) => DType a a
-sigm = let z = D $ \a -> let s = 1 / (1 + exp (-a))
-                         in (s, undefined)
-       in z
+sigm = D $ \a -> let s = 1 / (1 + exp (-a))
+                 in (s, undefined)
 --D $ \dm -> (dm * s * (1 - s), undefined))
 
 mm :: DType Double Double
@@ -258,12 +281,12 @@ sh x = putStr . formatFixed 2 $ x
 p1 = [2, 3] # [0.1, 0.1..] ! "ij"
 p2 = [3, 5] # [0.01, 0.01..] ! "jk"
 
-c = p1 * p2
+p' = p1 * p2
 
 -- Assumes single-letter index names
 onesLike c = let d  = map iDim $ dims c
                  ch = concat $ map iName $ dims c
              in d # (repeat 1) ! ch
 
-p1Grad = (onesLike c) * p2
-p2Grad = (onesLike c) * p1
+p1Grad = (onesLike p') * p2
+p2Grad = (onesLike p') * p1
