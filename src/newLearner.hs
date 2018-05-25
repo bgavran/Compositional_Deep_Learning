@@ -1,9 +1,10 @@
 {-# LANGUAGE 
              EmptyCase,
-             FlexibleContexts,
              FlexibleInstances,
+             FlexibleContexts,
              InstanceSigs,
              MultiParamTypeClasses,
+             PartialTypeSignatures,
              LambdaCase,
              MultiWayIf,
              NamedFieldPuns,
@@ -43,19 +44,12 @@ newtype DType a b = D {
   eval :: a -> (b, DType b a) -- D b a is here instead of b -> a because sometimes we'd like to have higher order gradients
 }
 
-dConstr :: ((p -> a -> prod) -> (b, DType b (p -> a -> prod))) -> DType (p -> a -> prod) b
-dConstr = D
-
 newtype ParaType p a b = Para {
   evalP :: DType (Z p, a) b
 }
 
-data RType p a b 
-  = Rara (Z p) a b
-  deriving (Eq, Show)
-
 instance Cat.Category DType where
-  type Allowed DType a = Cat.Additive a
+  type Allowed DType x = Cat.Additive x
   id      = D $ \a -> (a, Cat.id)
   (D g) . (D f)   = D $ \a -> let (b, f') = f a
                                   (c, g') = g b
@@ -76,53 +70,39 @@ instance Cat.Cocartesian DType where
   inr = D $ \b -> ((Cat.zero, b), Cat.exr)
   jam = D $ \(a, b) -> (a Cat.^+ b, Cat.dup)
 
-instance Cat.Closed DType where
-  apply :: DType (a -> b, a) b
-  apply = D $ \(f, a) -> (f a, applyGrad)
+instance Cat.Closed DType DType where
+  apply :: DType (DType a b, a) b
+  apply = D $ \(D op, a) -> let (b, op') = op a
+                            in (b, D $ \b' -> ((error "Can't differentiate w.r.t functions!", f op' b'), undefined))
   
-  curry :: DType (a, b) c -> DType a (b -> c)
-  curry (D fTuple) = D $ \a -> (\b -> fst $ fTuple (a, b) , bcA)
+  curry :: (Additive3 a b c) => DType (a, b) c -> DType a (DType b c)
+  curry (D op) = D $ \a -> (D $ \b -> let (c, op') = op (a, b)
+                                      in (c, Cat.exr Cat.. op'), D undefined) 
+--                                                               D :: DType (DType b c) a
+  
+  uncurry :: DType a (DType b c) -> DType (a, b) c
+  uncurry (D op) = D $ \(a, b) -> let (D opbc, op') = op a     -- opbc :: b -> (c, DType c b), op' :: DType (DType b c) a
+                                      (c, D opbc')    = opbc b -- opbc' :: c -> (b, DType b c)
+                                  in (c, D $ \c' -> let (b', bc') = opbc' c'
+                                                    in ((undefined, b'), D undefined)) 
+--                                       D :: c (a, b)                   D (a, b) c
+----------
 
-  uncurry :: DType a (b -> c) -> DType (a, b) c
-  uncurry (D fCurry)= D $ \(a, b) -> (fst (fCurry a) b, cBA)
+fstTuple :: (Additive3 a b c) => DType a (b, c) -> DType a b
+fstTuple = (Cat.exl Cat..)
 
-  --uncurrying might be possible with recursive DTypes?
+sndTuple :: (Additive3 a b c) => DType a (b, c) -> DType a c
+sndTuple = (Cat.exr Cat..)
 
 ----------
 
-c :: DType (DType a b, a) b
-c = D $ \(dType, a) -> (f dType a, D $ \b' -> ((undefined, f (dfD dType a) b'), undefined))
---                                 D :: b (DType a b, a)
-
-unc :: DType a (DType b c) -> DType (a, b) c
-unc dFCurry = D $ \(a, b) -> (f (f dFCurry a) b, undefined)
---                                               D :: c (a, b)
-
-----------
-
-applyGrad :: DType b (a -> b, a)
-applyGrad = D $ \b -> ((\a -> undefined, undefined), undefined)
-
-fCurry :: a -> (DType b c, DType (DType b c) a)
-fCurry = undefined
-
-bcA :: DType (b -> c) a
-bcA = undefined
-
-cBA :: DType c (b, a)
-cBA = undefined
-
-fTuple :: (a, b) -> (c, DType c (a, b))
-fTuple = undefined
-
-
-type AdditiveABC a b c = (Cat.Additive a, Cat.Additive b, Cat.Additive c)
+type Additive3 a b c = (Cat.Additive a, Cat.Additive b, Cat.Additive c)
 
 -- The type annotation can be even more general, but that's not needed for now.
-(/\) :: AdditiveABC a b c => DType a b -> DType a c -> DType a (b, c)
+(/\) :: Additive3 a b c => DType a b -> DType a c -> DType a (b, c)
 f /\ g = (f `Cat.x` g) Cat.. Cat.dup 
 
-(\/) :: AdditiveABC a b c => DType a c -> DType b c -> DType (a, b) c
+(\/) :: Additive3 a b c => DType a c -> DType b c -> DType (a, b) c
 f \/ g = Cat.jam Cat.. (f `Cat.x` g)
 
 ----------------------------------
@@ -160,6 +140,7 @@ data Learner p a b = L {
   cost  :: CostF b
 }
 
+-- Can we curry learners? Make a learner that learns another learner? Is that meta learning? hmmm
 instance Cat.Category (Learner p) where
   type Allowed (Learner p) x = Cat.Additive x
   id = L {param = NoP,
@@ -212,42 +193,69 @@ zeroD = D $ \_ -> (Cat.zero, zeroD)
 add :: Cat.Additive a => DType (a, a) a
 add = Cat.jam
 
-zadd :: Num a => DType (Z a, a) a
-zadd = D $ \(P a, b) -> (a + b, D $ \dm -> ((P dm, dm), undefined))
+addn :: Double -> DType Double Double
+addn n = D $ \a -> (a + n, Cat.id)
 
 mul :: (Cat.Additive a, Num a) => DType (a, a) a
 mul = D $ \(a, b) -> (a * b, scale b /\ scale a)
 
-zmul :: Num a => DType (Z a, a) a
-zmul = D $ \(P a, b) -> (a * b, D $ \dm -> ((P $ dm * b, dm * a), undefined))
+constD :: Cat.Additive a => a -> DType a a
+constD k = D $ \_ -> (k, zeroD)
 
 something :: (Cat.Additive a, Num a) => a -> DType a a
 something k = D $ \dm -> (k * dm, zeroD)
 
 scale :: (Cat.Additive a, Num a) => a -> DType a a
-scale k = D $ \a -> let f = (*k) 
-                    in (f a, something k)
+scale k = D $ \a -> let f = (*k)  
+                    in (f a, constD k) 
               
 sigm :: (Cat.Additive a, Floating a) => DType a a
 sigm = D $ \a -> let s = 1 / (1 + exp (-a))
-                 in (s, undefined)
---D $ \dm -> (dm * s * (1 - s), undefined))
+                 in (s, scale (s * (1 - s)))
 
-mm :: DType Double Double
-mm = scale 4
+
+add4 :: DType Double Double
+add4  = f (Cat.curry add) 4
+
+gg :: DType (Double, Double) Double
+gg = mul Cat.. (Cat.id `Cat.x` add4)
+
+--D $ \dm -> (dm * s * (1 - s), undefined))
+--
+--dsigm :: (Floating a, Cat.Additive a) => DType a a
+--dsigm = let s = 0.7
+--            os = 1 - s
+--        in f (Cat.curry mul) s
+
+expD :: (Cat.Additive a, Floating a) => DType a a
+expD = D $ \a -> let val = exp a
+                  in (val, scale val)
 
 f :: DType a b -> a -> b
-f op v = fst $ eval op v
+f (D op) v = fst $ op v
 
 dfD :: DType a b -> a -> DType b a
-dfD op v = snd $ eval op v 
+dfD (D op) v = snd $ op v 
 
 df :: Cat.Additive b => DType a b -> a -> a
-df op v = f (dfD op v) Cat.one
+df opD v = let dD = dfD opD v
+           in f dD Cat.one
 
-dfn :: Cat.Additive a => Int -> DType a a -> a -> a
+-- Perhaps this dfn function is implemented incorrectly? Stuff with a -> b or b -> a seems fishy?
+--dfn :: (_) => Int -> _ -> _ -> _
 dfn 0 op v = f op Cat.one
 dfn n op v = dfn (n - 1) (dfD op v) Cat.one
+
+allDerivs :: Cat.Additive a => DType a a -> a -> [a]
+allDerivs op v = f op v : df op v : map (\n -> dfn n op v) [2..7]
+
+------------------------
+
+zadd :: Num a => DType (Z a, a) a
+zadd = D $ \(P a, b) -> (a + b, D $ \dm -> ((P dm, dm), undefined))
+
+zmul :: Num a => DType (Z a, a) a
+zmul = D $ \(P a, b) -> (a * b, D $ \dm -> ((P $ dm * b, dm * a), undefined))
 
 paraFnMul :: ParaType Double Double Double
 paraFnMul = Para zmul
@@ -278,15 +286,9 @@ ds # cs = listArray ds cs :: Array Double
 
 sh x = putStr . formatFixed 2 $ x
 
-p1 = [2, 3] # [0.1, 0.1..] ! "ij"
-p2 = [3, 5] # [0.01, 0.01..] ! "jk"
+p1 = [2, 3] # [0.2, 0.2..] ! "ij"
+p2 = [3, 5] # [0.1, 0.1..] ! "jk"
 
-p' = p1 * p2
+p' = p1 * p2 -- 
 
--- Assumes single-letter index names
-onesLike c = let d  = map iDim $ dims c
-                 ch = concat $ map iName $ dims c
-             in d # (repeat 1) ! ch
-
-p1Grad = (onesLike p') * p2
-p2Grad = (onesLike p') * p1
+p3 = f mul (p1, p2) -- works out of the box with tensor product (since it's tensor product is a natural generalization of multiplication)
