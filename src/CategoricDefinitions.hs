@@ -1,10 +1,23 @@
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE DefaultSignatures #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE 
+             EmptyCase,
+             FlexibleInstances,
+             FlexibleContexts,
+             InstanceSigs,
+             MultiParamTypeClasses,
+             PartialTypeSignatures,
+             LambdaCase,
+             MultiWayIf,
+             NamedFieldPuns,
+             TupleSections,
+             DeriveFunctor,
+             TypeOperators,
+             ScopedTypeVariables,
+             ConstraintKinds,
+             RankNTypes,
+             NoMonomorphismRestriction,
+             TypeFamilies,
+             UndecidableInstances 
+                            #-}
 
 module CategoricDefinitions where
 
@@ -51,11 +64,12 @@ class Category k => Cocartesian k where
   jam :: (Allowed k a,
           Allowed k (a, a)) => (a, a) `k` a
 
-class Cartesian k => Closed k where
-  apply :: (a -> b, a) `k` b
-  curry :: ((a, b) `k` c) -> a `k` (b -> c)
-  uncurry :: a `k` (b -> c) -> (a, b) `k` c
+class Cartesian k => Closed k e where
+  apply :: (a `e` b, a) `k` b
+  curry :: Allowed3 k a b c => ((a, b) `k` c) -> a `k` (b `e` c)
+  uncurry :: a `k` (b `e` c) -> (a, b) `k` c
 
+type Allowed3 k a b c = (Allowed k a, Allowed k b, Allowed k c)
 --------------------------------------
 
 class Additive a where
@@ -87,7 +101,7 @@ instance Cartesian (->) where
   exr = \(_, b) -> b
   dup = \a -> (a, a)
 
-instance Closed (->) where
+instance Closed (->) (->) where
   apply (f, a) = f a
   curry f      = \a b -> f (a, b)
   uncurry f    = \(a, b) -> f a b
