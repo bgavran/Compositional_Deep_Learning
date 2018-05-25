@@ -4,7 +4,7 @@ This is my attempt to [continue](https://github.com/bgavran/autodiff) formalizin
 
 It started as a Haskell implementation of the [Backprop as Functor](https://arxiv.org/abs/1711.10455) paper which is an intriguing approach to neural networks from the perspective of Category Theory.
 
-It's still a work in progress, but in the meantime there have been a few papers that started talking about similar things!
+In the meantime there have been a few papers that started talking about similar things!
 
 [a) The simple essence of automatic differentiation](http://conal.net/papers/essence-of-ad/)
 
@@ -13,6 +13,4 @@ It's still a work in progress, but in the meantime there have been a few papers 
 Both a) and b) talk about implementation of generalized reverse-mode AD in a purely functional context.
 My [previous](https://github.com/bgavran/autodiff) attempt in implementing such a system relied heavily on the concept of a computational graph, which seems to have been rendered obsolete by these amazing approaches.
 
-The `src` directory currently consists of two files: implementations of `Backprop as Functor` and `The simple essence of automatic differentiation` papers.
-
-At the moment, they're not usable in any way and this is done exclusively for learning purposes.
+The `src` directory currently consists of various files with implementations of `Backprop as Functor` and `The simple essence of automatic differentiation` papers, together with my experiments.
