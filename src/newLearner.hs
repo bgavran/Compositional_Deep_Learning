@@ -38,14 +38,11 @@ instance Applicative Z where
   (P f)     <*> p = fmap f p
   (f `X` g) <*> p = (f <*> p) `X` (g <*> p)
   
+
 --------------------------------
 
 newtype DType a b = D {
   eval :: a -> (b, DType b a) -- D b a is here instead of b -> a because sometimes we'd like to have higher order gradients
-}
-
-newtype ParaType p a b = Para {
-  evalP :: DType (Z p, a) b
 }
 
 instance Cat.Category DType where
@@ -74,10 +71,12 @@ instance Cat.Closed DType DType where
   apply :: DType (DType a b, a) b
   apply = D $ \(D op, a) -> let (b, op') = op a
                             in (b, D $ \b' -> ((error "Can't differentiate w.r.t functions!", f op' b'), undefined))
-  
+--                                 D :: b  ->  (DType a b,                                    a)
+ 
   curry :: (Additive3 a b c) => DType (a, b) c -> DType a (DType b c)
   curry (D op) = D $ \a -> (D $ \b -> let (c, op') = op (a, b)
-                                      in (c, Cat.exr Cat.. op'), D undefined) 
+                                      in (c, Cat.exr Cat.. op'), D $ \(D bc) -> let a' = undefined
+                                                                                in undefined) 
 --                                                               D :: DType (DType b c) a
   
   uncurry :: DType a (DType b c) -> DType (a, b) c
@@ -86,14 +85,6 @@ instance Cat.Closed DType DType where
                                   in (c, D $ \c' -> let (b', bc') = opbc' c'
                                                     in ((undefined, b'), D undefined)) 
 --                                       D :: c (a, b)                   D (a, b) c
-----------
-
-fstTuple :: (Additive3 a b c) => DType a (b, c) -> DType a b
-fstTuple = (Cat.exl Cat..)
-
-sndTuple :: (Additive3 a b c) => DType a (b, c) -> DType a c
-sndTuple = (Cat.exr Cat..)
-
 ----------
 
 type Additive3 a b c = (Cat.Additive a, Cat.Additive b, Cat.Additive c)
@@ -107,9 +98,14 @@ f \/ g = Cat.jam Cat.. (f `Cat.x` g)
 
 ----------------------------------
 
+newtype ParaType p a b = Para {
+  evalP :: DType (Z p, a) b
+}
+
 instance Cat.Category (ParaType p) where
-  id = let f = D $ \(_, a) -> (a, D $ \b' -> ((NoP, b'), f))
+  id = let f = D $ \(_, a) -> (a, D $ \b' -> ((NoP, b'), f))       
        in Para f
+
   (Para dg) . (Para df) = Para $ D $ \(p `X` q, a) -> let (b, f') = eval df (p, a)
                                                           (c, g') = eval dg (q, b)
                                                       in (c, D $ \c' -> let ((q', b'), g'') = eval g' c'
@@ -161,6 +157,7 @@ instance Cat.Category (Learner p) where
                                         cost   = c2} 
 
 ------ Is cost function a part of a learner? Cost function fits somewhere in between learners, when composing them? as part of learner composition?
+-- Enriching the learners in Cost? But that wouldn't make sense since we need a cost for (B, B') prediction?
 
 instance Cat.Monoidal (Learner p) where
   L p1 ir1 u1 c1 `x` L p2 ir2 u2 c2 = L {param = p1 `X` p2,
@@ -263,18 +260,25 @@ paraFnMul = Para zmul
 paraFnAdd :: ParaType Double Double Double
 paraFnAdd = Para zadd
 
+functorParaD :: ParaType p a b -> DType (Z p, a) b
+functorParaD (Para f) = f
+
+functorDPara :: DType a b -> p -> ParaType p a b
+functorDPara (D f) p = undefined
+--        f :: a -> (b, D b a)
+
 ---- This is basically a functor from Para -> Learn. Except we need to fix cost and update functions.
-functorL :: ParaType p a b -> (p -> p -> p) -> CostF b -> Learner p a b
-functorL para u c = L {
+functorParaLearn :: ParaType p a b -> (p -> p -> p) -> CostF b -> Learner p a b
+functorParaLearn para u c = L {
   param = undefined, -- initialized randomly in the shape of param?
   implreq = para,
   upd = \(p, pGrad) -> u <$> p <*> pGrad, -- just applying the update fn recursively to the param data stucture
   cost = c
 }
 
-l1 = functorL paraFnMul sgd trivialCost
+l1 = functorParaLearn paraFnMul sgd trivialCost
 
-l2 = functorL paraFnAdd sgd sqrError
+l2 = functorParaLearn paraFnAdd sgd sqrError
 
 l3 = l2 Cat.. l1
 
