@@ -23,6 +23,7 @@ module CategoricDefinitions where
 
 import GHC.Exts (Constraint)
 
+
 class NoConstraint a where
 
 instance NoConstraint a where
@@ -32,44 +33,69 @@ class Category k where
   type Allowed k a = ()
 
   id  :: Allowed k a => a `k` a
-  (.) :: (Allowed k a, 
-          Allowed k b, 
-          Allowed k c) => (b `k` c) -> (a `k` b) -> (a `k` c)
+  (.) :: Allowed3 k a b c => (b `k` c) -> (a `k` b) -> (a `k` c)
 
+ --x :: (Allowed k a,
+ --      Allowed k b,
+ --      Allowed k c,
+ --      Allowed k d,
+ --      Allowed k (a, b),
+ --      Allowed k (c, d)) => (a `k` c) -> (b `k` d) -> ((a, b) `k` (c, d)) 
+ --x :: (a `k` c) -> (b `k` d) -> ((a, b) `k` (c, d)) 
 class Category k => Monoidal k where
-  x :: (Allowed k a,
-        Allowed k b,
-        Allowed k c,
-        Allowed k d,
-        Allowed k (a, b),
-        Allowed k (c, d)) => (a `k` c) -> (b `k` d) -> ((a, b) `k` (c, d)) 
+--  x :: (Allowed k a,
+--        Allowed k b,
+--        Allowed k c,
+--        Allowed k d,
+--        Allowed k (a, b),
+--        Allowed k (c, d)) => (a `k` c) -> (b `k` d) -> ((a, b) `k` (c, d)) 
+  x :: (a `k` c) -> (b `k` d) -> ((a, b) `k` (c, d)) 
+
 
 class Monoidal k => Cartesian k where
-  exl :: (Allowed k a,
-          Allowed k b,
-          Allowed k (a, b)) => (a, b) `k` a
-  exr :: (Allowed k a,
-          Allowed k b,
-          Allowed k (a, b)) => (a, b) `k` b
-  dup :: (Allowed k (a, a),
-          Allowed k a) => a `k` (a, a)
+  exl :: (a, b) `k` a
+  exr :: (a, b) `k` b
+  dup :: a `k` (a, a)
 
 class Category k => Cocartesian k where
-  inl :: (Allowed k a,
-          Allowed k b,
-          Allowed k (a, b)) => a `k` (a, b)
-  inr :: (Allowed k a,
-          Allowed k b,
-          Allowed k (a, b)) => b `k` (a, b)
-  jam :: (Allowed k a,
-          Allowed k (a, a)) => (a, a) `k` a
+  inl :: Allowed k b => a `k` (a, b)
+  inr :: Allowed k a => b `k` (a, b)
+  jam :: Allowed k a => (a, a) `k` a
 
 class Cartesian k => Closed k e where
   apply :: (a `e` b, a) `k` b
-  curry :: Allowed3 k a b c => ((a, b) `k` c) -> a `k` (b `e` c)
+  curry :: ((a, b) `k` c) -> a `k` (b `e` c)
   uncurry :: a `k` (b `e` c) -> (a, b) `k` c
 
-type Allowed3 k a b c = (Allowed k a, Allowed k b, Allowed k c)
+type Allowed3 k a b c = (Allowed k a, 
+                         Allowed k b, 
+                         Allowed k c)
+
+type AllowedSpecial1 k a b c = (Allowed k (a, b), Allowed k c, Allowed k (c, c))
+type AllowedSpecial2 k a b c = (Allowed3 k a b c, Allowed k (a, b))
+
+(^.) = (CategoricDefinitions..)
+
+(/\) :: (Cartesian k, AllowedSpecial1 k c d b) => b `k` c -> b `k` d -> b `k` (c, d)
+f /\ g = (f `x` g) ^. dup 
+
+(\/) :: (Cocartesian k, Monoidal k, AllowedSpecial1 k a b c) => a `k` c -> b `k` c -> (a, b) `k` c
+f \/ g = jam ^. (f `x` g)
+
+
+-- Uncurried versions of the above ops and their inverses
+fork :: (Cartesian k, AllowedSpecial1 k c d b) => (b `k` c, b `k` d) -> b `k` (c, d)
+fork (f, g) = f /\ g
+
+unfork :: (Cartesian k, AllowedSpecial2 k c d b) => b `k` (c, d) -> (b `k` c, b `k` d)
+unfork h = (exl ^. h, exr ^. h)
+
+join :: (Cocartesian k, Monoidal k, AllowedSpecial1 k a b c) => (a `k` c, b `k` c) -> (a, b) `k` c
+join (f, g) = f \/ g
+
+unjoin :: (Cocartesian k, Monoidal k, AllowedSpecial2 k a b c) => (a, b) `k` c -> (a `k` c, b `k` c) 
+unjoin h = (h ^. inl, h ^. inr)
+
 --------------------------------------
 
 class Additive a where
