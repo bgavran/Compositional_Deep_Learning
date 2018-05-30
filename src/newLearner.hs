@@ -19,10 +19,12 @@
              UndecidableInstances 
                             #-}
 
+import Prelude hiding (id, (.), curry, uncurry)
+import qualified Prelude as P
 
 import Numeric.LinearAlgebra.Array
 import Numeric.LinearAlgebra.Array.Util
-import qualified CategoricDefinitions as Cat
+import CategoricDefinitions
 
 --------------------------------
 
@@ -45,128 +47,133 @@ newtype DType a b = D {
   eval :: a -> (b, DType a b) -- D b a is here instead of b -> a because sometimes we'd like to have higher order gradients
 }
 
-instance Cat.Category DType where
-  type Allowed DType x = Cat.Additive x
-  id      = D $ \a -> (a, Cat.id)
+instance Category DType where
+  type Allowed DType x = Additive x
+  id      = D $ \a -> (a, id)
   D g . D f   = D $ \a -> let (b, f') = f a
                               (c, g') = g b
-                          in (c, g' Cat.. f')
+                          in (c, g' . f')
 
-instance Cat.Monoidal DType where
+instance Monoidal DType where
   D f `x` D g = D $ \(a, b) -> let (c, f') = f a
                                    (d, g') = g b
-                               in ((c, d), f' `Cat.x` g')
+                               in ((c, d), f' `x` g')
 
-instance Cat.Cartesian DType where
-  exl = D $ \(a, _) -> (a, Cat.exl)
-  exr = D $ \(_, b) -> (b, Cat.exr)
-  dup = D $ \a -> ((a, a), Cat.dup)
+instance Cartesian DType where
+  exl = D $ \(a, _) -> (a, exl)
+  exr = D $ \(_, b) -> (b, exr)
+  dup = D $ \a -> ((a, a), dup)
 
-instance Cat.Cocartesian DType where
-  inl = D $ \a -> ((a, Cat.zero), Cat.inl)
-  inr = D $ \b -> ((Cat.zero, b), Cat.inr)
-  jam = D $ \(a, b) -> (a Cat.^+ b, Cat.jam)
+instance Cocartesian DType where
+  inl = D $ \a -> ((a, zero), inl)
+  inr = D $ \b -> ((zero, b), inr)
+  jam = D $ \(a, b) -> (a ^+ b, jam)
 
---instance Cat.Closed DType DType where
---  apply :: DType (DType a b, a) b
---  apply = D $ \(D op, a) -> let (b, op') = op a
---                            in (b, D $ \b' -> ((error "Can't differentiate w.r.t functions!", f op' b'), undefined))
-----                                 D :: b  ->  (DType a b,                                    a)
--- 
---  curry :: (Additive3 a b c) => DType (a, b) c -> DType a (DType b c)
---  curry (D op) = D $ \a -> (D $ \b -> let (c, op') = op (a, b)
---                                      in (c, Cat.exr Cat.. op'), D $ \(D bc) -> let a' = undefined
---                                                                                in undefined) 
-----                                                               D :: DType (DType b c) a
---  
---  uncurry :: DType a (DType b c) -> DType (a, b) c
---  uncurry (D op) = D $ \(a, b) -> let (D opbc, op') = op a     -- opbc :: b -> (c, DType c b), op' :: DType (DType b c) a
---                                      (c, D opbc')    = opbc b -- opbc' :: c -> (b, DType b c)
---                                  in (c, D $ \c' -> let (b', bc') = opbc' c'
---                                                    in ((undefined, b'), D undefined)) 
-----                                       D :: c (a, b)                   D (a, b) c
-------------
+instance Closed DType where
+-- The derivatives of these ops always being the same as these ops just means that we can't change apply, curry and uncurry. Whatever you do in your system, they always stay the same. They are their own derivatives.
+  
+  apply :: DType (DType a b, a) b
+  apply = D $ \(opD, a) -> (f opD a, apply)
 
-type Additive3 a b c = (Cat.Additive a, Cat.Additive b, Cat.Additive c)
+  curry :: (Additive3 a b c) => DType (a, b) c -> DType a (DType b c)
+  curry opD = D $ \a -> (D $ \b -> let (c, op') = eval opD (a, b)
+                                   in (c, op' . inr), curry opD)
+
+  uncurry :: DType a (DType b c) -> DType (a, b) c
+  uncurry opD = D $ \(a, b) -> let (opBc, _) = eval opD a
+                                   (c   , _) = eval opBc b
+                               in (c, uncurry opD)
 
 ------------------------------------
-sqr :: (Cat.Additive a, Num a) => DType a a
-sqr = mul Cat.. Cat.dup
 
-sqrError :: (Cat.Additive a, Num a) => DType (a, a) a
-sqrError = sqr Cat.. (Cat.id Cat.\/ scale (-1))
+instance {-# OVERLAPS #-} Additive a => Additive (DType a a) where 
+-- does this instance even make sense?
+  zero = id
+  one = undefined
+  (^+) = undefined
 
-add :: Cat.Additive a => DType (a, a) a
-add = Cat.jam
+
+applyF :: (x -> y) -> DType x y
+applyF f = D $ \x -> (f x, applyF f) -- this is a linearD function from conal's paper?!
+                                     -- this holds only for linear functions
+
+newtype ParaType p a b = Para {
+  evalP :: DType (Z p, a) b
+}
+
+comp :: (Additive7 (Z p) a b c (DType b c) (DType a b) (DType a c)) 
+        => DType (Z p, b) c -> DType (Z p, a) b -> DType (Z p, a) c
+gD `comp` fD = let v = applyF (uncurry (.)) . (curry gD `x` curry fD)
+               in tupleToZ (uncurry v)
+
+-- this function is a really hacky thing to make instantiating parametrized category in this context possible
+tupleToZ :: DType ((Z p, Z p), a) b -> DType (Z p, a) b
+tupleToZ (D op) = D $ \((P p1 `X` P p2), a) -> let (c, opD') = op ((P p1, P p2), a)
+                                               in (c, tupleToZ opD')
+
+instance Category (ParaType p) where
+  type Allowed (ParaType p) x = (Additive2 (Z p) x)  
+  type AllowedComp (ParaType p) a b c = (Additive3 a b c, Additive4 (Z p) (DType b c) (DType a b) (DType a c))
+
+  id = Para exr
+  (Para g) . (Para f) = let v = applyF (uncurry (.)) . (curry g `x` curry f)
+                            h = tupleToZ (uncurry v)
+                        in Para h
+      
+------------------------------------
+
+add :: Additive a => DType (a, a) a
+add = jam
 
 addn :: Double -> DType Double Double
-addn n = D $ \a -> (a + n, Cat.id)
+addn n = D $ \a -> (a + n, id)
 
-zeroD :: Cat.Additive a => DType a a
-zeroD = D $ \_ -> (Cat.zero, zeroD)
+constD :: (Additive a, Num a) => a -> DType a a
+constD k = D $ \_ -> (k, scale (zero))
 
-constD :: Cat.Additive a => a -> DType a a
-constD k = D $ \_ -> (k, zeroD)
-
-----something :: (Cat.Additive a, Num a) => a -> DType a a
+----something :: (Additive a, Num a) => a -> DType a a
 ----something k = D $ \dm -> (k * dm, zeroD)
 ----
-scale :: (Cat.Additive a, Num a) => a -> DType a a
+
+scale :: (Additive a, Num a) => a -> DType a a
 scale k = D $ \a -> let f = (*k)  
                     in (f a, constD k) 
 
-mul :: (Cat.Additive a, Num a) => DType (a, a) a
-mul = D $ \(a, b) -> (a * b, scale b Cat.\/ scale a)
+mul :: (Additive a, Num a) => DType (a, a) a
+mul = D $ \(a, b) -> (a * b, scale b \/ scale a)
 
-expD :: (Cat.Additive a, Floating a) => DType a a
+expD :: (Additive a, Floating a) => DType a a
 expD = D $ \a -> let val = exp a
                  in (val, scale val)
+
+sqr :: (Additive a, Num a) => DType a a
+sqr = mul . dup
+
+sqrError :: (Additive a, Num a) => DType (a, a) a
+sqrError = sqr . (id \/ scale (-1))
+
 
 ------------------------------------
 
 newtype ContType k r a b = Cont ( (b `k` r) -> (a `k` r)) -- a -> b -> r
 
-cont :: (Cat.Category k, Cat.Allowed3 k a b r) => (a `k` b) -> ContType k r a b
-cont f = Cont (Cat.. f)
+cont :: (Category k, AllowedComp k a b r) => (a `k` b) -> ContType k r a b
+cont f = Cont (. f)
 
-instance Cat.Category k => Cat.Category (ContType k r) where
-  type Allowed (ContType k r) a = Cat.Allowed k a
-  id = Cont Cat.id
-  Cont g . Cont f = Cont (f Cat.. g)
+instance Category k => Category (ContType k r) where
+  type Allowed (ContType k r) a = Allowed k a
+  id = Cont id
+  Cont g . Cont f = Cont (f . g)
 
-type MonType k a b c d r = (Cat.Cocartesian k, 
-                            Cat.Monoidal k, 
-                            Cat.AllowedSpecial1 k a b r,
-                            Cat.AllowedSpecial2 k c d r)
-
-x :: MonType k a b c d r => 
-     ContType k r a c -> ContType k r b d -> ContType k r (a, b) (c, d)
-Cont f `x` Cont g = Cont (Cat.join Cat.. (f `Cat.x` g) Cat.. Cat.unjoin)
+--x :: MonType k a b c d r => 
+--     ContType k r a c -> ContType k r b d -> ContType k r (a, b) (c, d)
+--Cont f `x` Cont g = Cont (Cat.join Cat.. (f `Cat.x` g) Cat.. Cat.unjoin)
 
 --instance (Cat.Cocartesian k, Cat.Monoidal k, Cat.Allowed k (r, r), Cat.Allowed k r) => Cat.Monoidal (ContType k r) where
 --  x :: (Cat.Allowed k (a, b), Cat.Allowed k (c, d), Cat.Allowed k c, Cat.Allowed k d) => 
 --       ContType k r a c -> ContType k r b d -> ContType k r (a, b) (c, d)
 --  Cont f `x` Cont g = x (Cont f) (Cont g)
 
-------------------------------------
---
---newtype ParaType p a b = Para {
---  evalP :: DType (Z p, a) b
---}
---
---instance Cat.Category (ParaType p) where
---  id = let f = D $ \(_, a) -> (a, D $ \b' -> ((NoP, b'), f))       
---       in Para f
---
---  (Para dg) . (Para df) = Para $ D $ \(p `X` q, a) -> let (b, f') = eval df (p, a)
---                                                          (c, g') = eval dg (q, b)
---                                                      in (c, D $ \c' -> let ((q', b'), g'') = eval g' c'
---                                                                            ((p', a'), f'') = eval f' b'
---                                                                        in ((p' `X` q', a'), evalP $ (Para g'') Cat.. (Para f'')))
-----  (Para dg) . (Para df) = let h = D $ \(p `X` q, a) -> let newF = D $ \a -> undefined -- curry (eval df) p 
-----                                                       in undefined
-----                          in Para h
---
 --instance Cat.Monoidal (ParaType p) where
 --  (Para df) `x` (Para dg) = Para $ D $ \(p `X` q, (a, b)) -> let (c, f') = eval df (p, a)
 --                                                                 (d, g') = eval dg (q, b)
@@ -223,10 +230,10 @@ Cont f `x` Cont g = Cont (Cat.join Cat.. (f `Cat.x` g) Cat.. Cat.unjoin)
 --}
 --
 --------------------------------------
---
---sgd :: (Num p, Fractional p) => p -> p -> p
---sgd p pGrad = p - 0.001 * pGrad
---
+
+sgd :: (Num p, Fractional p) => p -> p -> p
+sgd p pGrad = p - 0.001 * pGrad
+
 --trivialCost :: CostF b
 --trivialCost = D $ \(b, b') -> (undefined, D $ \_ -> ((b, b'), undefined))
 --
@@ -234,13 +241,6 @@ Cont f `x` Cont g = Cont (Cat.join Cat.. (f `Cat.x` g) Cat.. Cat.unjoin)
 --sigm :: (Cat.Additive a, Floating a) => DType a a
 --sigm = D $ \a -> let s = 1 / (1 + exp (-a))
 --                 in (s, scale (s * (1 - s)))
---
---
---add4 :: DType Double Double
---add4  = f (Cat.curry add) 4
---
---gg :: DType (Double, Double) Double
---gg = mul Cat.. (Cat.id `Cat.x` add4)
 --
 ----D $ \dm -> (dm * s * (1 - s), undefined))
 ----
@@ -256,9 +256,9 @@ f (D op) v = fst $ op v
 dfD :: DType a b -> a -> DType a b
 dfD (D op) v = snd $ op v 
 
-df :: Cat.Additive a => DType a b -> a -> b
+df :: Additive a => DType a b -> a -> b
 df opD v = let dD = dfD opD v
-           in f dD Cat.one
+           in f dD one
 
 ---- Perhaps this dfn function is implemented incorrectly? Stuff with a -> b or b -> a seems fishy?
 ----dfn :: (_) => Int -> _ -> _ -> _
@@ -272,10 +272,10 @@ df opD v = let dD = dfD opD v
 --
 --zadd :: Num a => DType (Z a, a) a
 --zadd = D $ \(P a, b) -> (a + b, D $ \dm -> ((P dm, dm), undefined))
---
---zmul :: Num a => DType (Z a, a) a
---zmul = D $ \(P a, b) -> (a * b, D $ \dm -> ((P $ dm * b, dm * a), undefined))
---
+
+zmul :: ParaType p a b
+zmul = undefined
+
 --paraFnMul :: ParaType Double Double Double
 --paraFnMul = Para zmul
 --
@@ -310,11 +310,11 @@ df opD v = let dD = dfD opD v
 
 ds # cs = listArray ds cs :: Array Double
 
-sh x = putStr . formatFixed 2 $ x
+sh x = putStr P.. formatFixed 2 $ x
 
 p1 = [2, 3] # [0.2, 0.2..] ! "ij"
 p2 = [3, 5] # [0.1, 0.1..] ! "jk"
 
 p' = p1 * p2 -- 
 
---p3 = f mul (p1, p2) -- works out of the box with tensor product (since it's tensor product is a natural generalization of multiplication)
+p3 = f mul (p1, p2) -- works out of the box with tensor product (since it's tensor product is a natural generalization of multiplication)
