@@ -101,12 +101,10 @@ newtype ParaType p a b = Para {
   evalP :: DType (Z p, a) b
 }
 
-comp :: (Additive7 (Z p) a b c (DType b c) (DType a b) (DType a c)) 
-        => DType (Z p, b) c -> DType (Z p, a) b -> DType (Z p, a) c
-gD `comp` fD = let v = applyF (uncurry (.)) . (curry gD `x` curry fD)
-               in tupleToZ (uncurry v)
-
 -- this function is a really hacky thing to make instantiating parametrized category in this context possible
+-- It's basically because composition in Category requires the parameter of codomain to be the same as in domain, 
+-- but in this case the codomain's parameter is the product of domain parameters. I want to consider them the same, 
+-- which is why I'm here taking their product and _then_ wrapping them in Z.
 tupleToZ :: DType ((Z p, Z p), a) b -> DType (Z p, a) b
 tupleToZ (D op) = D $ \((P p1 `X` P p2), a) -> let (c, opD') = op ((P p1, P p2), a)
                                                in (c, tupleToZ opD')
