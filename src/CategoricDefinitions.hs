@@ -34,20 +34,17 @@ class Category k where
   type Allowed k a :: Constraint
   type Allowed k a = ()
 
-  type AllowedComp k a b c :: Constraint
-  type AllowedComp k a b c = (Allowed k a, Allowed k b, Allowed k c)
+  type AllowedSeq k a b c :: Constraint
+  type AllowedSeq k a b c = Allowed3 k a b c
 
   id  :: Allowed k a => a `k` a
-  (.) :: AllowedComp k a b c => (b `k` c) -> (a `k` b) -> (a `k` c)
+  (.) :: AllowedSeq k a b c => (b `k` c) -> (a `k` b) -> (a `k` c)
 
- --x :: (Allowed k a,
- --      Allowed k b,
- --      Allowed k c,
- --      Allowed k d,
- --      Allowed k (a, b),
- --      Allowed k (c, d)) => (a `k` c) -> (b `k` d) -> ((a, b) `k` (c, d)) 
 class Category k => Monoidal k where
-  x :: (a `k` c) -> (b `k` d) -> ((a, b) `k` (c, d)) 
+  type AllowedMon k a b c d :: Constraint
+  type AllowedMon k a b c d = Allowed4 k a b c d
+
+  x :: AllowedMon k a b c d => (a `k` c) -> (b `k` d) -> ((a, b) `k` (c, d)) 
 
 
 class Monoidal k => Cartesian k where
@@ -62,30 +59,32 @@ class Category k => Cocartesian k where
 
 class Cartesian k => Closed k where
   apply :: (a `k` b, a) `k` b
-  curry :: AllowedComp k a b c => ((a, b) `k` c) -> a `k` (b `k` c)
+  curry :: AllowedSeq k a b c => ((a, b) `k` c) -> a `k` (b `k` c)
   uncurry :: a `k` (b `k` c) -> (a, b) `k` c
 
-(/\) :: (Cartesian k, AllowedComp k b (b, b) (c, d)) => b `k` c -> b `k` d -> b `k` (c, d)
+(/\) :: (Cartesian k, AllowedSeq k b (b, b) (c, d), AllowedMon k b b c d) 
+     => b `k` c -> b `k` d -> b `k` (c, d)
 f /\ g = (f `x` g) . dup 
 
-(\/) :: (Cocartesian k, Monoidal k, AllowedComp k (a, b) (c, c) c, Allowed k c) => a `k` c -> b `k` c -> (a, b) `k` c
+(\/) :: (Cocartesian k, Monoidal k, AllowedSeq k (a, b) (c, c) c, Allowed k c, AllowedMon k a b c c) 
+     => a `k` c -> b `k` c -> (a, b) `k` c
 f \/ g = jam . (f `x` g)
 
 
 ---- Uncurried versions of the above ops and their inverses
-fork :: (Cartesian k, AllowedComp k b (b, b) (c, d)) 
+fork :: (Cartesian k, AllowedSeq k b (b, b) (c, d), AllowedMon k b b c d) 
      => (b `k` c, b `k` d) -> b `k` (c, d)
 fork (f, g) = f /\ g
 
-unfork :: (Cartesian k, AllowedComp k b (c, d) c, AllowedComp k b (c, d) d) 
+unfork :: (Cartesian k, AllowedSeq k b (c, d) c, AllowedSeq k b (c, d) d) 
        => b `k` (c, d) -> (b `k` c, b `k` d)
 unfork h = (exl . h, exr . h)
 
-join :: (Cocartesian k, Monoidal k, AllowedComp k (a, b) (c, c) c, Allowed k c) 
+join :: (Cocartesian k, Monoidal k, AllowedSeq k (a, b) (c, c) c, Allowed k c, AllowedMon k a b c c) 
      => (a `k` c, b `k` c) -> (a, b) `k` c
 join (f, g) = f \/ g
 
-unjoin :: (Cocartesian k, Monoidal k, AllowedComp k a (a, b) c, AllowedComp k b (a, b) c, Allowed k a, Allowed k b) 
+unjoin :: (Cocartesian k, Monoidal k, AllowedSeq k a (a, b) c, AllowedSeq k b (a, b) c, Allowed k a, Allowed k b) 
        => (a, b) `k` c -> (a `k` c, b `k` c) 
 unjoin h = (h . inl, h . inr)
 
@@ -96,12 +95,19 @@ class Additive a where
   one :: a
   (^+) :: a -> a -> a
 
+type Allowed2 k a b = (Allowed k a, Allowed k b)
+type Allowed3 k a b c = (Allowed2 k a b, Allowed k c)
+type Allowed4 k a b c d = (Allowed3 k a b c, Allowed k d)
+type Allowed5 k a b c d e = (Allowed4 k a b c d, Allowed k e)
+
 type Additive2 a b = (Additive a, Additive b)
 type Additive3 a b c = (Additive2 a b, Additive c)
 type Additive4 a b c d = (Additive3 a b c, Additive d)
 type Additive5 a b c d e = (Additive4 a b c d, Additive e)
 type Additive6 a b c d e f = (Additive5 a b c d e, Additive f)
 type Additive7 a b c d e f g = (Additive6 a b c d e f, Additive g)
+type Additive8 a b c d e f g h = (Additive7 a b c d e f g, Additive h)
+type Additive9 a b c d e f g h i = (Additive8 a b c d e f g h , Additive i)
 -------------------------------------
 -- Instances
 -------------------------------------
@@ -134,3 +140,4 @@ instance {-# OVERLAPS #-} (Additive a, Additive b) => Additive (a, b) where
   zero = (zero, zero)
   one = (one, one)
   (a1, b1) ^+ (a2, b2) = (a1 ^+ a2, b1 ^+ b2)
+
