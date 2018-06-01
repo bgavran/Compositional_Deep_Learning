@@ -70,8 +70,6 @@ instance Cocartesian DType where
   jam = D $ \(a, b) -> (a ^+ b, jam)
 
 instance Closed DType where
--- The derivatives of these ops always being the same as these ops just means that we can't change apply, curry and uncurry. Whatever you do in your system, they always stay the same. They are their own derivatives.
-  
   apply :: DType (DType a b, a) b
   apply = D $ \((D op), a) -> (fst $ op a, apply)
 
@@ -103,8 +101,7 @@ newtype ParaType p a b = Para {
 
 -- this fn is useful both in parallel and sequential composition of Para
 -- find a better name for this?
---compose :: (Additive8 (Z p) a1 a2 b1 b2 (DType a1 b1) (DType a2 b2) (DType a3 b3))
---        => (DType a1 b1 -> DType a2 b2 -> DType a3 b3) -> DType (Z p, a1) b1 -> DType (Z p, a2) b2 -> DType (Z p, a3) b3
+-- this is just like curryUncurry except it takes two functions and combines them? a category??
 compose fn f g = uncurry $ fn $ curry f `x` curry g
 
 appliedFn :: (Additive4 a b c a1)
@@ -127,10 +124,6 @@ varToZ (D op) = D $ \(P a) -> let (f, opD') = op a
 curryUncurry :: (Closed k1, Closed k2, AllowedSeq k1 a1 b1 c1) 
              => (a1 `k1` (b1 `k1` c1) -> a2 `k2` (b2 `k2` c2)) -> (a1, b1) `k1` c1 -> (a2, b2) `k2` c2
 curryUncurry f = uncurry . f . curry
-
-leftToZ :: Additive3 p a b => DType (p, a) b -> DType (Z p, a) b
-leftToZ = curryUncurry varToZ
-
 
 type AllowedPara p x = Additive2 (Z p) x
 type AllowedParaComp p a b c = (Additive3 a b c, Additive4 (Z p) (DType b c) (DType a b) (DType a c))
@@ -297,6 +290,8 @@ sqr = mul . dup
 sqrError :: (Additive a, Num a) => DType (a, a) a
 sqrError = sqr . (id \/ scale (-1))
 
+leftToZ :: Additive3 p a b => DType (p, a) b -> DType (Z p, a) b
+leftToZ = curryUncurry varToZ
 
 zmul :: (Num a, Additive a) => ParaType a a a
 zmul = Para $ leftToZ mul
