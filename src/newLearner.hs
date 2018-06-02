@@ -65,6 +65,8 @@ instance Cartesian DType where
   dup = D $ \a -> ((a, a), dup)
 
 instance Cocartesian DType where
+  type AllowedCoCar DType a = Additive a
+
   inl = D $ \a -> ((a, zero), inl)
   inr = D $ \b -> ((zero, b), inr)
   jam = D $ \(a, b) -> (a ^+ b, jam)
@@ -85,7 +87,7 @@ instance Closed DType where
 ------------------------------------
 
 instance {-# OVERLAPS #-} Additive a => Additive (DType a a) where 
--- does this instance even make sense?
+-- does this instance even make sense? Perhaps just zero is needed and it's not "additive"
   zero = id
   one = undefined
   (^+) = undefined
@@ -101,7 +103,7 @@ newtype ParaType p a b = Para {
 
 -- this fn is useful both in parallel and sequential composition of Para
 -- find a better name for this?
--- this is just like curryUncurry except it takes two functions and combines them? a category??
+-- this is just like curryUncurry except it takes two functions and combines them?
 compose fn f g = uncurry $ fn $ curry f `x` curry g
 
 appliedFn :: (Additive4 a b c a1)
@@ -139,8 +141,7 @@ instance Category (ParaType p) where
 instance Monoidal (ParaType p) where
   type AllowedMon (ParaType p) a b c d = (AllowedParaComp p a b c, Additive3 d (DType b d) (DType (a, b) (c, d))) -- perhaps this can be reduced even further?
 
-  (Para f) `x` (Para g) = Para $ let fn = appliedFn x
-                                 in compose (tupleToZ . fn) f g
+  (Para f) `x` (Para g) = Para $ let fn = appliedFn x in compose (tupleToZ . fn) f g
 
 ------------------------------------
 
@@ -154,14 +155,44 @@ instance Category k => Category (ContType k r) where
   id = Cont id
   Cont g . Cont f = Cont (f . g)
 
---x :: MonType k a b c d r => 
---     ContType k r a c -> ContType k r b d -> ContType k r (a, b) (c, d)
---Cont f `x` Cont g = Cont (Cat.join Cat.. (f `Cat.x` g) Cat.. Cat.unjoin)
+instance (Monoidal k, Cocartesian k) => Monoidal (ContType k r) where
+  type AllowedMon (ContType k r) a b c d = (AllowedSeq k (a, b) (r, r) r, 
+                                            AllowedSeq k c (c, d) r,
+                                            AllowedSeq k d (c, d) r,
+                                            AllowedMon k a b r r, 
+                                            Allowed k r, 
+                                            Allowed k c,
+                                            Allowed k d,
+                                            AllowedCoCar k c,
+                                            AllowedCoCar k d,
+                                            AllowedCoCar k r)
+  (Cont f) `x` (Cont g) = Cont $ join . (f `x` g) . unjoin
 
---instance (Cat.Cocartesian k, Cat.Monoidal k, Cat.Allowed k (r, r), Cat.Allowed k r) => Cat.Monoidal (ContType k r) where
---  x :: (Cat.Allowed k (a, b), Cat.Allowed k (c, d), Cat.Allowed k c, Cat.Allowed k d) => 
---       ContType k r a c -> ContType k r b d -> ContType k r (a, b) (c, d)
---  Cont f `x` Cont g = x (Cont f) (Cont g)
+instance (Cartesian k, Cocartesian k) => Cartesian (ContType k r) where
+  type AllowedCar (ContType k r) a = (Allowed k a,
+                                      AllowedSeq k a (a, a) r,
+                                      AllowedCoCar k a
+                                     )
+
+  exl = Cont $ undefined
+  exr = Cont $ undefined
+  dup = Cont $ undefined
+
+instance (Monoidal k, Cocartesian k) => Cocartesian (ContType k r) where
+  type AllowedCoCar (ContType k r) a = (AllowedSeq k (a, a) (r, r) r,
+                                        Allowed k r,
+                                        AllowedMon k a a r r,
+                                        AllowedCoCar k r,
+                                        Allowed k a,
+                                        AllowedCoCar k a)
+  inl = Cont $ undefined
+  inr = Cont $ undefined
+  jam = Cont $ join . dup
+
+------------------------------------
+
+class HasDot s where
+  dot :: u -> (u -> s)
 
 ------------------------------------
 
