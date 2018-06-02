@@ -357,15 +357,13 @@ outputLearner l = let p  = param l
                       fl = (f . evalP . implreq) l
                   in (curry fl) p
 
----- Tensor manipulations
---
---ds # cs = listArray ds cs :: Array Double
---
---sh x = putStr P.. formatFixed 2 $ x
---
---p1 = [2, 3] # [0.2, 0.2..] ! "ij"
---p2 = [3, 5] # [0.1, 0.1..] ! "jk"
---
---p' = p1 * p2 -- 
---
---p3 = f mul (p1, p2) -- works out of the box with tensor product (since it's tensor product is a natural generalization of multiplication)
+-- Tensor manipulations
+
+ds # cs = listArray ds cs :: Array Double
+
+sh x = putStr P.. formatFixed 2 $ x -- pretty print the tensor
+
+t1 = [2, 3] # [1, 2..] ! "ij"
+t2 = [3, 5] # [1, 1..] ! "jk"
+
+t3 = f mul (t1, t2) -- works out of the box with tensor product (since tensor product is a natural generalization of multiplication)
