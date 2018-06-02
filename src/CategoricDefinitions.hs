@@ -48,43 +48,49 @@ class Category k => Monoidal k where
 
 
 class Monoidal k => Cartesian k where
-  exl :: (a, b) `k` a
-  exr :: (a, b) `k` b
-  dup :: a `k` (a, a)
+  type AllowedCar k a :: Constraint
+  type AllowedCar k a = ()
+
+  exl :: AllowedCar k a => (a, b) `k` a
+  exr :: AllowedCar k a => (a, b) `k` b
+  dup :: AllowedCar k a => a `k` (a, a)
 
 class Category k => Cocartesian k where
-  inl :: Allowed k b => a `k` (a, b)
-  inr :: Allowed k a => b `k` (a, b)
-  jam :: Allowed k a => (a, a) `k` a
+  type AllowedCoCar k a :: Constraint
+  type AllowedCoCar k a = ()
+
+  inl :: AllowedCoCar k b => a `k` (a, b)
+  inr :: AllowedCoCar k a => b `k` (a, b)
+  jam :: AllowedCoCar k a => (a, a) `k` a
 
 class Cartesian k => Closed k where
   apply :: (a `k` b, a) `k` b
   curry :: AllowedSeq k a b c => ((a, b) `k` c) -> a `k` (b `k` c)
   uncurry :: a `k` (b `k` c) -> (a, b) `k` c
 
-(/\) :: (Cartesian k, AllowedSeq k b (b, b) (c, d), AllowedMon k b b c d) 
+(/\) :: (Cartesian k, AllowedSeq k b (b, b) (c, d), AllowedMon k b b c d, AllowedCar k b) 
      => b `k` c -> b `k` d -> b `k` (c, d)
 f /\ g = (f `x` g) . dup 
 
-(\/) :: (Cocartesian k, Monoidal k, AllowedSeq k (a, b) (c, c) c, Allowed k c, AllowedMon k a b c c) 
+(\/) :: (Cocartesian k, Monoidal k, AllowedSeq k (a, b) (c, c) c, Allowed k c, AllowedMon k a b c c, AllowedCoCar k c) 
      => a `k` c -> b `k` c -> (a, b) `k` c
 f \/ g = jam . (f `x` g)
 
 
 ---- Uncurried versions of the above ops and their inverses
-fork :: (Cartesian k, AllowedSeq k b (b, b) (c, d), AllowedMon k b b c d) 
+fork :: (Cartesian k, AllowedSeq k b (b, b) (c, d), AllowedMon k b b c d, AllowedCar k b) 
      => (b `k` c, b `k` d) -> b `k` (c, d)
 fork (f, g) = f /\ g
 
-unfork :: (Cartesian k, AllowedSeq k b (c, d) c, AllowedSeq k b (c, d) d) 
+unfork :: (Cartesian k, AllowedSeq k b (c, d) c, AllowedSeq k b (c, d) d, AllowedCar k c) 
        => b `k` (c, d) -> (b `k` c, b `k` d)
 unfork h = (exl . h, exr . h)
 
-join :: (Cocartesian k, Monoidal k, AllowedSeq k (a, b) (c, c) c, Allowed k c, AllowedMon k a b c c) 
+join :: (Cocartesian k, Monoidal k, AllowedSeq k (a, b) (c, c) c, Allowed k c, AllowedMon k a b c c, AllowedCoCar k c) 
      => (a `k` c, b `k` c) -> (a, b) `k` c
 join (f, g) = f \/ g
 
-unjoin :: (Cocartesian k, Monoidal k, AllowedSeq k a (a, b) c, AllowedSeq k b (a, b) c, Allowed k a, Allowed k b) 
+unjoin :: (Cocartesian k, Monoidal k, AllowedSeq k a (a, b) c, AllowedSeq k b (a, b) c, Allowed k a, Allowed k b, AllowedCoCar k a, AllowedCoCar k b) 
        => (a, b) `k` c -> (a `k` c, b `k` c) 
 unjoin h = (h . inl, h . inr)
 
