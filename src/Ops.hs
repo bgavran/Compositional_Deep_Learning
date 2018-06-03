@@ -32,11 +32,8 @@ import Learner
 sgd :: (Num p, Fractional p) => p -> p -> p
 sgd p pGrad = p - 0.001 * pGrad
 
-f :: DType a b -> a -> b
-f (D op) v = fst $ op v
-
 dfD :: DType a b -> a -> DType a b
-dfD (D op) v = snd $ op v 
+dfD (D op) = snd . op
 
 df :: Additive a => DType a b -> a -> b
 df opD v = let dD = dfD opD v

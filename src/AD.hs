@@ -30,6 +30,10 @@ newtype DType a b = D {
   evalD :: a -> (b, DType a b) -- D a b is here instead of a -> b because sometimes we'd like to have higher order gradients
 }
 
+linearD :: (x -> y) -> DType x y
+linearD f = D $ \x -> (f x, linearD f) 
+
+
 instance Category DType where
   type Allowed DType x = Additive x
   id      = D $ \a -> (a, id)
@@ -43,30 +47,48 @@ instance Monoidal DType where
                                in ((c, d), f' `x` g')
 
 instance Cartesian DType where
-  exl = D $ \(a, _) -> (a, exl)
-  exr = D $ \(_, b) -> (b, exr)
-  dup = D $ \a -> ((a, a), dup)
+  exl = linearD exl
+  exr = linearD exr
+  dup = linearD dup
 
 instance Cocartesian DType where
   type AllowedCoCarIn DType a b = Additive a
   type AllowedCoCarJam DType a = Additive a
 
-  inl = D $ \a -> ((a, zero), inl)
-  inr = D $ \b -> ((zero, b), inr)
-  jam = D $ \(a, b) -> (a ^+ b, jam)
+  inl = linearD inlF
+  inr = linearD inrF
+  jam = linearD jamF
+
+f :: DType a b -> a -> b
+f (D op) = fst . op
 
 instance Closed DType where
   apply :: DType (DType a b, a) b
-  apply = D $ \((D op), a) -> (fst $ op a, apply)
+  apply = linearD (uncurry f)
 
   curry :: (Additive3 a b c) => DType (a, b) c -> DType a (DType b c)
-  curry d@(D op) = D $ \a -> (D $ \b -> let (c, op') = op (a, b)
-                                        in (c, op' . inr), curry d)
-
+  curry (D op) = linearD $ \a -> D $ \b -> let (c, op') = op (a, b)
+                                           in (c, f (curry op') a)
+ 
   uncurry :: DType a (DType b c) -> DType (a, b) c
-  uncurry d@(D op) = D $ \(a, b) -> let ((D bc), _) = op a
-                                        (c     , _) = bc b
-                                    in (c, uncurry d)
+  uncurry d = linearD $ \(a, b) -> f (f d a) b
+
+
+
+lcc :: (Additive3 a b c) => DType (a, b) c -> a -> (DType b c)
+lcc (D op) = \a -> D $ \b -> let (c, op') = op (a, b)
+                             in (c, f (curry op') a)
+
+--lucc :: DType a (DType b c) -> (a, b) -> c
+lucc d = \(a, b) -> apply (apply (d, a), b)
+
+
+cc' :: (Additive3 a b c) => DType (a, b) c -> DType a (DType b c)
+cc'  = linearD . lcc
+
+
+--ucc :: DType a (DType b c) -> DType (a, b) c
+--ucc = linearD . lucc
 
 ------------------------------------
 
@@ -75,10 +97,6 @@ instance {-# OVERLAPS #-} Additive a => Additive (DType a a) where
   zero = id
   one = undefined
   (^+) = undefined
-
-applyF :: (x -> y) -> DType x y
-applyF f = D $ \x -> (f x, applyF f) -- this is a linearD function from conal's paper?!
-                                     -- this holds only for linear functions
 
 
 ------------------------------------------------------------------------

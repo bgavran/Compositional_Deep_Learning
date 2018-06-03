@@ -153,3 +153,11 @@ instance {-# OVERLAPS #-} (Additive a, Additive b) => Additive (a, b) where
   one = (one, one)
   (a1, b1) ^+ (a2, b2) = (a1 ^+ a2, b1 ^+ b2)
 
+inlF :: Additive b => a -> (a, b)
+inlF = \a -> (a, zero)
+
+inrF :: Additive a => b -> (a, b)
+inrF = \b -> (zero, b)
+
+jamF :: Additive a => (a, a) -> a
+jamF = \(a, b) -> a ^+ b

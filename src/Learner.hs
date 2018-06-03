@@ -73,7 +73,7 @@ varToZ (D op) = D $ \(P a) -> let (f, opD') = op a
 
 appliedFn :: (Additive4 a b c a1)
           => (a -> b -> c) -> DType a1 (a, b) -> DType a1 c
-appliedFn fn = ((applyF (uncurry fn)) .)
+appliedFn fn = ((linearD (uncurry fn)) .)
 
 type AllowedPara p x = Additive2 (Z p) x
 type AllowedParaComp p a b c = (Additive3 a b c, Additive4 (Z p) (DType b c) (DType a b) (DType a c))
