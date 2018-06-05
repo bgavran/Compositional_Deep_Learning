@@ -21,86 +21,77 @@
 
 module CategoricDefinitions where
 
-import Prelude hiding ((.))
+import Prelude hiding (id, (.), curry, uncurry)
 import qualified Prelude as P
 import GHC.Exts (Constraint)
-
-
-class NoConstraint a where
-
-instance NoConstraint a where
 
 class Category k where
   type Allowed k a :: Constraint
   type Allowed k a = ()
 
-  type AllowedSeq k a b c :: Constraint
-  type AllowedSeq k a b c = Allowed3 k a b c
-
   id  :: Allowed k a => a `k` a
-  (.) :: AllowedSeq k a b c => (b `k` c) -> (a `k` b) -> (a `k` c)
+  (.) :: Allowed3 k a b c => (b `k` c) -> (a `k` b) -> (a `k` c)
 
 class Category k => Monoidal k where
-  type AllowedMon k a b c d :: Constraint
-  type AllowedMon k a b c d = Allowed4 k a b c d
-
-  x :: AllowedMon k a b c d => (a `k` c) -> (b `k` d) -> ((a, b) `k` (c, d)) 
+  x :: (a `k` c) -> (b `k` d) -> ((a, b) `k` (c, d)) 
 
 
 class Monoidal k => Cartesian k where
-  type AllowedCarEx k a b :: Constraint
-  type AllowedCarEx k a b = ()
-  
-  type AllowedCarDup k a :: Constraint
-  type AllowedCarDup k a = ()
+  type AllowedCar k a :: Constraint
+  type AllowedCar k a = ()
 
-  exl :: AllowedCarEx k a b => (a, b) `k` a
-  exr :: AllowedCarEx k a b => (a, b) `k` b
-  dup :: AllowedCarDup k a => a `k` (a, a)
+  exl :: AllowedCar k b => (a, b) `k` a
+  exr :: AllowedCar k a => (a, b) `k` b
+  dup :: AllowedCar k a => a `k` (a, a)
 
 class Category k => Cocartesian k where
-  type AllowedCoCarIn k a b :: Constraint
-  type AllowedCoCarIn k a b = ()
+  type AllowedCoCar k a :: Constraint
+  type AllowedCoCar k a = Additive a
 
-  type AllowedCoCarJam k a :: Constraint
-  type AllowedCoCarJam k a = ()
-
-  inl :: AllowedCoCarIn k b a => a `k` (a, b)
-  inr :: AllowedCoCarIn k a b => b `k` (a, b)
-  jam :: AllowedCoCarJam k a => (a, a) `k` a
+  inl :: AllowedCoCar k b => a `k` (a, b)
+  inr :: AllowedCoCar k a => b `k` (a, b)
+  jam :: AllowedCoCar k a => (a, a) `k` a
 
 class Cartesian k => Closed k where
   apply :: (a `k` b, a) `k` b
-  curry :: AllowedSeq k a b c => ((a, b) `k` c) -> a `k` (b `k` c)
+  curry :: ((a, b) `k` c) -> a `k` (b `k` c)
   uncurry :: a `k` (b `k` c) -> (a, b) `k` c
 
-(/\) :: (Cartesian k, AllowedSeq k b (b, b) (c, d), AllowedMon k b b c d, AllowedCarDup k b) 
-     => b `k` c -> b `k` d -> b `k` (c, d)
+
+--(/\) :: (Cartesian k, Allowed k b, Allowed k (b, b), Allowed k (c, d))
+--     => b `k` c -> b `k` d -> b `k` (c, d)
 f /\ g = (f `x` g) . dup 
 
-(\/) :: (Cocartesian k, Monoidal k, AllowedSeq k (a, b) (c, c) c, Allowed k c, AllowedMon k a b c c, AllowedCoCarJam k c) 
-     => a `k` c -> b `k` c -> (a, b) `k` c
+--(\/) :: (Cocartesian k, Monoidal k, Allowed k (a, b), Allowed k (c, c), Allowed k c)
+--     => a `k` c -> b `k` c -> (a, b) `k` c
 f \/ g = jam . (f `x` g)
 
-
----- Uncurried versions of the above ops and their inverses
-fork :: (Cartesian k, AllowedSeq k b (b, b) (c, d), AllowedMon k b b c d, AllowedCarDup k b) 
-     => (b `k` c, b `k` d) -> b `k` (c, d)
+--fork :: (Cartesian k, Allowed k b, Allowed k (b, b), Allowed k (c, d))
+--     => (b `k` c,  b `k` d) -> b `k` (c, d)
 fork (f, g) = f /\ g
 
-unfork :: (Cartesian k, AllowedSeq k b (c, d) c, AllowedSeq k b (c, d) d, AllowedCarEx k c d) 
-       => b `k` (c, d) -> (b `k` c, b `k` d)
+--unfork :: (Cartesian k, Allowed k b, Allowed k (c, d), Allowed k c, Allowed k d)
+--       => b `k` (c, d) -> (b `k` c, b `k` d)
 unfork h = (exl . h, exr . h)
 
-join :: (Cocartesian k, Monoidal k, AllowedSeq k (a, b) (c, c) c, Allowed k c, AllowedMon k a b c c, AllowedCoCarJam k c) 
-     => (a `k` c, b `k` c) -> (a, b) `k` c
+--join :: (Cocartesian k, Monoidal k, Allowed k (a, b), Allowed k (c, c), Allowed k c) 
+--     => (a `k` c, b `k` c) -> (a, b) `k` c
 join (f, g) = f \/ g
 
-unjoin :: (Cocartesian k, Monoidal k, AllowedSeq k a (a, b) c, AllowedSeq k b (a, b) c, Allowed k a, Allowed k b, AllowedCoCarIn k b a, AllowedCoCarIn k a b) 
-       => (a, b) `k` c -> (a `k` c, b `k` c) 
+--unjoin :: (Cocartesian k, Monoidal k, Allowed k a, Allowed k (a, b), Allowed k c, Allowed k b)
+--       => (a, b) `k` c -> (a `k` c, b `k` c) 
 unjoin h = (h . inl, h . inr)
 
 --------------------------------------
+
+
+class NumCat k a where
+  negateC :: a `k` a
+  addC :: (a, a) `k` a
+  mulC :: (a, a) `k` a
+
+class Scalable k a where
+  scale :: a -> (a `k` a)
 
 class Additive a where
   zero :: a
@@ -141,6 +132,12 @@ instance Closed (->) where
   curry f      = \a b -> f (a, b)
   uncurry f    = \(a, b) -> f a b
 
+instance Num a => NumCat (->) a where
+  negateC = negate
+  addC = uncurry (+)
+  mulC = uncurry (*)
+  
+
 -------------------------------------
 
 instance {-# OVERLAPS #-} (Num a) => Additive a where
@@ -153,11 +150,12 @@ instance {-# OVERLAPS #-} (Additive a, Additive b) => Additive (a, b) where
   one = (one, one)
   (a1, b1) ^+ (a2, b2) = (a1 ^+ a2, b1 ^+ b2)
 
+
+
 inlF :: Additive b => a -> (a, b)
-inlF = \a -> (a, zero)
-
 inrF :: Additive a => b -> (a, b)
-inrF = \b -> (zero, b)
-
 jamF :: Additive a => (a, a) -> a
+
+inlF = \a -> (a, zero)
+inrF = \b -> (zero, b)
 jamF = \(a, b) -> a ^+ b
