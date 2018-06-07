@@ -24,8 +24,8 @@ module AD where
 
 import Prelude hiding (id, (.), curry, uncurry)
 import qualified Prelude as P
-import Numeric.LinearAlgebra.Array
-import Numeric.LinearAlgebra.Array.Util
+--import Numeric.LinearAlgebra.Array
+--import Numeric.LinearAlgebra.Array.Util
 
 import CategoricDefinitions
 import Additive
@@ -71,7 +71,7 @@ instance (Num s, NumCat k s, Scalable k s) => NumCat (GADType k) s where
   negateC = linearD negateC negateC
   addC = linearD addC addC
   mulC = undefined
-  --mulC = GAD $ \(a, b) -> (a * b, scale b \/ scale a)
+  --mulC = GAD $ \(a, b) -> (a * b, scale b \/ scale a) -- \/ has a bunch of extra constraints?
 
 mul :: (Additive a, Num a) => BackpropType (a, a) a
 mul = GAD $ \(a, b) -> (a * b, scale b \/ scale a)
@@ -150,17 +150,3 @@ instance Closed k => Closed (GADType k) where
 --
 --
 --
-
-
--- Tensor manipulations
-
-ds # cs = listArray ds cs :: Array Double
-
-sh x = putStr P.. formatFixed 2 $ x -- pretty print the tensor
-
-t1 = [2, 3] # [1, 2..] ! "ij"
-t2 = [3, 5] # [1, 1..] ! "jk"
-
-t3 = f mul (t1, t2) -- works out of the box with tensor product (since tensor product is a natural generalization of multiplication)
-
-dt1 = df mul (t1, t2)
