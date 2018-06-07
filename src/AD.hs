@@ -16,7 +16,8 @@
              RankNTypes,
              NoMonomorphismRestriction,
              TypeFamilies,
-             UndecidableInstances 
+             UndecidableInstances,
+             GeneralizedNewtypeDeriving
                             #-}
 
 module AD where
@@ -27,12 +28,15 @@ import Numeric.LinearAlgebra.Array
 import Numeric.LinearAlgebra.Array.Util
 
 import CategoricDefinitions
+import Additive
+import Dual
+import Cont
 
 newtype GADType k a b = GAD {
   evalGAD :: a -> (b, a `k` b) 
 }
 
-linearD :: (a -> b) -> (a `k` b)-> GADType k a b
+linearD :: (a -> b) -> (a `k` b) -> GADType k a b
 linearD f f' = GAD $ \x -> (f x, f') 
 
 
@@ -57,7 +61,7 @@ instance Cartesian k => Cartesian (GADType k) where
   dup = linearD dup dup
 
 instance Cocartesian k => Cocartesian (GADType k) where
-  type AllowedCoCar (GADType k) a = (AllowedCoCar k a, Allowed (GADType k) a)
+  type AllowedCoCar (GADType k) a = (AllowedCoCar k a, Allowed (GADType k) a) -- whatever the category k allows + additive
 
   inl = linearD inlF inl
   inr = linearD inrF inr
@@ -73,141 +77,57 @@ mul :: (Additive a, Num a) => BackpropType (a, a) a
 mul = GAD $ \(a, b) -> (a * b, scale b \/ scale a)
 ------------------------------------------------------------------------
 
-------------------------------------------------------------------------
+{-
+Notes:
+It seems the newtype D k a b needs to be recursively defined if D is to be a CCC.
+Right now stuff seems to be missing and preventing the operations to be..., well closed.
 
-f :: GADType k a b -> a -> b
-f (GAD op) = fst . op
+-}
 
+--newtype GD a b = GD (GADType (DualType (->+)) a b)
+--  deriving (Category, Monoidal, Cartesian, Cocartesian)
 
-newtype DualType k a b = Dual {
-  evalDual :: b `k` a
-}
-
-instance Category k => Category (DualType k) where
-  type Allowed (DualType k) a = Allowed k a
-
-  id = Dual id
-  Dual g . Dual f = Dual (f . g)
-
-instance Monoidal k => Monoidal (DualType k) where 
-  Dual f `x` Dual g = Dual (f `x` g)
-
-instance (Monoidal k, Cocartesian k) => Cartesian (DualType k) where
-  type AllowedCar (DualType k) a = AllowedCoCar k a
-
-  exl = Dual inl
-  exr = Dual inr
-  dup = Dual jam
-
-instance Cartesian k => Cocartesian (DualType k) where
-  type AllowedCoCar (DualType k) a = AllowedCar k a
-
-  inl = Dual exl
-  inr = Dual exr
-  jam = Dual dup
-
-instance Scalable k a => Scalable (DualType k) a where
-  scale s = Dual (scale s)
-
-------------------------------------------------------------------------
-
-newtype a ->+ b = AddFun {
-  evalAF :: a -> b
-}
-
-instance Category (->+) where
-  type Allowed (->+) a = Additive a
-  id = AddFun id
-  AddFun g . AddFun f = AddFun (g . f)
-
-instance Monoidal (->+) where
-  AddFun f `x` AddFun g = AddFun (f `x` g)
-
-instance Cartesian (->+) where
-  exl = AddFun exl
-  exr = AddFun exr
-  dup = AddFun dup
-
-instance Cocartesian (->+) where
-  inl = AddFun inlF
-  inr = AddFun inrF
-  jam = AddFun jamF
-
-instance Num a => Scalable (->+) a where
-  scale a = AddFun $ \da -> a * da
-
-------------------------------------------------------------------------
+newtype DType a b = D (BackpropType a b) 
+  deriving (Category, Monoidal, Cartesian, Cocartesian)
 
 type BackpropType a b = GADType (DualType (->+)) a b
+
+evalD :: DType a b -> a -> (b, DualType (->+) a b)
+evalD (D bType) = evalGAD bType
+
+djam :: DualType (->+) Double (Double, Double)
+djam = Dual jam
 
 bjam :: BackpropType (Double, Double) Double
 bjam = jam
 
-df :: GADType (DualType (->+)) a b -> a -> b -> a
-df op x = evalAF $ evalDual $ snd $ evalGAD op x
+f :: GADType k a b -> a -> b
+f (GAD op) = fst . op
 
+df :: GADType (DualType (->+)) a b -> a -> b -> a
+df op = evalAF . evalDual . snd . evalGAD op
+
+--dfD :: GADType (DualType (->+)) a b -> a -> DualType (->+) a b
+dfD op = snd . evalGAD op
 ------------------------------------------------------------------------
 
-newtype ContType k r a b = Cont ( (b `k` r) -> (a `k` r)) -- a -> b -> r
+-- apply = D $ \((D op), a) -> (fst $ op a, apply)
 
-cont :: (Category k, Allowed3 k a b r) => (a `k` b) -> ContType k r a b
-cont f = Cont (. f)
+ttt :: DualType (->+) (DType a b, a) b
+ttt = undefined
 
-instance Category k => Category (ContType k r) where
-  type Allowed (ContType k r) a = Allowed k a
-  id = Cont id
-  Cont g . Cont f = Cont (f . g)
+--fn :: DType a b -> a -> 
 
---instance Monoidal k => Monoidal (ContType k r) where
---  type AllowedMon (ContType k r) a b c d = (AllowedSeq k (a, b) (r, r) r, 
---                                            AllowedSeq k c (c, d) r,
---                                            AllowedSeq k d (c, d) r,
---                                            AllowedMon k a b r r, 
---                                            Allowed k r, 
---                                            Allowed k c,
---                                            Allowed k d,
---                                            AllowedCoCarJam k r,
---                                            AllowedCoCarIn k c d,
---                                            AllowedCoCarIn k d c,
---                                            Cocartesian k
---                                            )
---  (Cont f) `x` (Cont g) = Cont $ join . (f `x` g) . unjoin
---
---instance Cartesian k => Cartesian (ContType k r) where
---  type AllowedCarEx (ContType k r) a b = ()
---  type AllowedCarDup (ContType k r) a = (AllowedSeq k a (a, a) r,
---                                         Allowed k a,
---                                         AllowedCoCarIn k a a,
---                                         Cocartesian k
---                                        )
---
---  exl = Cont $ undefined
---  exr = Cont $ undefined
---  dup = Cont $ undefined
---
---instance Cocartesian k => Cocartesian (ContType k r) where
---  type AllowedCoCarIn (ContType k r) a b = ()
---  type AllowedCoCarJam (ContType k r) a = (AllowedSeq k (a, a) (r, r) r,
---                                           Allowed k r,
---                                           AllowedMon k a a r r,
---                                           Allowed k a,
---                                           AllowedCoCarJam k r,
---                                           Monoidal k)
---  inl = Cont $ undefined
---  inr = Cont $ undefined
---  jam = Cont $ join . dup
---
---------------------------------------
+instance Closed DType where
+  apply :: DType (DType a b, a) b
+  apply = D $ GAD $ \(d, a) -> (fst $ evalD d a, ttt)
 
-applyk :: (a `k` b, a) `k` b
-applyk = undefined
-
-tt :: Closed k => (GADType k a b, a) `k` b
-tt = undefined
+  curry = undefined
+  uncurry = undefined
 
 instance Closed k => Closed (GADType k) where
   apply :: GADType k (GADType k a b, a) b
-  apply = GAD $ \(GAD op, a) -> (fst $ op a, tt)
+  apply = GAD $ \(GAD op, a) -> (fst $ op a, undefined)
 
   curry = undefined
   uncurry = undefined

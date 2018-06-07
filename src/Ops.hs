@@ -39,15 +39,6 @@ df :: Additive a => DType a b -> a -> b
 df opD v = let dD = dfD opD v
            in f dD one
 
----- Perhaps this dfn function is implemented incorrectly? Stuff with a -> b or b -> a seems fishy?
-----dfn :: (_) => Int -> _ -> _ -> _
---dfn 0 op v = f op Cat.one
---dfn n op v = dfn (n - 1) (dfD op v) Cat.one
---
---allDerivs :: Cat.Additive a => DType a a -> a -> [a]
---allDerivs op v = f op v : df op v : map (\n -> dfn n op v) [2..7]
---
-
 add :: Additive a => DType (a, a) a
 add = jam
 
