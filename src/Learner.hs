@@ -1,4 +1,4 @@
-{-# LANGUAGE 
+{-#r LANGUAGE 
              EmptyCase,
              FlexibleInstances,
              FlexibleContexts,
@@ -26,6 +26,13 @@ import qualified Prelude as P
 
 import CategoricDefinitions
 import AD
+
+--------------------------------
+{- Info
+    Learner category needs currying to be defined using ParaD. 
+    Learner requires Dual to be implemented properly to calculate cost.
+
+-}
 
 --------------------------------
 

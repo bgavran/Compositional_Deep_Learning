@@ -46,15 +46,15 @@ class Monoidal k => Cartesian k where
 
 class Category k => Cocartesian k where
   type AllowedCoCar k a :: Constraint
-  type AllowedCoCar k a = Additive a
+  type AllowedCoCar k a = Allowed k a
 
   inl :: AllowedCoCar k b => a `k` (a, b)
   inr :: AllowedCoCar k a => b `k` (a, b)
   jam :: AllowedCoCar k a => (a, a) `k` a
 
 class Cartesian k => Closed k where
-  apply :: (a `k` b, a) `k` b
-  curry :: ((a, b) `k` c) -> a `k` (b `k` c)
+  apply :: (a `k` b, a) -> b
+  curry :: Allowed3 k a b c => (a, b) `k` c -> a `k` (b `k` c)
   uncurry :: a `k` (b `k` c) -> (a, b) `k` c
 
 
