@@ -16,7 +16,8 @@
              RankNTypes,
              NoMonomorphismRestriction,
              TypeFamilies,
-             UndecidableInstances 
+             UndecidableInstances,
+             GeneralizedNewtypeDeriving
                             #-}
 
 module Additive where
@@ -37,6 +38,9 @@ instance Category (->+) where
 
 instance Monoidal (->+) where
   AddFun f `x` AddFun g = AddFun (f `x` g)
+  assocL = AddFun assocL
+  assocR = AddFun assocR
+  swap = AddFun swap
 
 instance Cartesian (->+) where
   exl = AddFun exl
@@ -50,3 +54,11 @@ instance Cocartesian (->+) where
 
 instance Num a => Scalable (->+) a where
   scale a = AddFun (*a)
+
+instance Num a => NumCat (->+) a where
+  negateC = AddFun negateC
+  addC = AddFun addC
+  mulC = AddFun mulC
+
+instance Floating a => FloatCat (->+) a where
+  expC = AddFun expC

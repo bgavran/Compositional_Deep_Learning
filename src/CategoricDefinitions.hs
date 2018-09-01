@@ -16,12 +16,13 @@
              RankNTypes,
              NoMonomorphismRestriction,
              TypeFamilies,
-             UndecidableInstances 
+             UndecidableInstances,
+             GeneralizedNewtypeDeriving
                             #-}
 
 module CategoricDefinitions where
 
-import Prelude hiding (id, (.), curry, uncurry)
+import Prelude hiding (id, (.))
 import qualified Prelude as P
 import GHC.Exts (Constraint)
 
@@ -32,9 +33,12 @@ class Category k where
   id  :: Allowed k a => a `k` a
   (.) :: Allowed3 k a b c => (b `k` c) -> (a `k` b) -> (a `k` c)
 
+-- By monoidal here we mean symmetric monoidal category
 class Category k => Monoidal k where
-  x :: (a `k` c) -> (b `k` d) -> ((a, b) `k` (c, d)) 
-
+  x :: Allowed6 k a b c d (a, b) (c, d) => (a `k` c) -> (b `k` d) -> ((a, b) `k` (c, d))
+  assocL :: Allowed3 k a b c => ((a, b), c) `k` (a, (b, c))
+  assocR :: Allowed3 k a b c => (a, (b, c)) `k` ((a, b), c)
+  swap :: Allowed2 k a b => (a, b) `k` (b, a)
 
 class Monoidal k => Cartesian k where
   type AllowedCar k a :: Constraint
@@ -51,12 +55,6 @@ class Category k => Cocartesian k where
   inl :: AllowedCoCar k b => a `k` (a, b)
   inr :: AllowedCoCar k a => b `k` (a, b)
   jam :: AllowedCoCar k a => (a, a) `k` a
-
-class Cartesian k => Closed k where
-  apply :: (a `k` b, a) -> b
-  curry :: Allowed3 k a b c => (a, b) `k` c -> a `k` (b `k` c)
-  uncurry :: a `k` (b `k` c) -> (a, b) `k` c
-
 
 --(/\) :: (Cartesian k, Allowed k b, Allowed k (b, b), Allowed k (c, d))
 --     => b `k` c -> b `k` d -> b `k` (c, d)
@@ -90,27 +88,16 @@ class NumCat k a where
   addC :: (a, a) `k` a
   mulC :: (a, a) `k` a
 
+class FloatCat k a where
+  expC :: a `k` a
+
 class Scalable k a where
   scale :: a -> (a `k` a)
 
 class Additive a where
   zero :: a
-  one :: a
   (^+) :: a -> a -> a
 
-type Allowed2 k a b = (Allowed k a, Allowed k b)
-type Allowed3 k a b c = (Allowed2 k a b, Allowed k c)
-type Allowed4 k a b c d = (Allowed3 k a b c, Allowed k d)
-type Allowed5 k a b c d e = (Allowed4 k a b c d, Allowed k e)
-
-type Additive2 a b = (Additive a, Additive b)
-type Additive3 a b c = (Additive2 a b, Additive c)
-type Additive4 a b c d = (Additive3 a b c, Additive d)
-type Additive5 a b c d e = (Additive4 a b c d, Additive e)
-type Additive6 a b c d e f = (Additive5 a b c d e, Additive f)
-type Additive7 a b c d e f g = (Additive6 a b c d e f, Additive g)
-type Additive8 a b c d e f g h = (Additive7 a b c d e f g, Additive h)
-type Additive9 a b c d e f g h i = (Additive8 a b c d e f g h , Additive i)
 -------------------------------------
 -- Instances
 -------------------------------------
@@ -121,35 +108,33 @@ instance Category (->) where
 
 instance Monoidal (->) where
   f `x` g = \(a, b) -> (f a, g b)
+  assocL = \((a, b), c) -> (a, (b, c))
+  assocR = \(a, (b, c)) -> ((a, b), c)
+  swap = \(a, b) -> (b, a)
 
 instance Cartesian (->) where
   exl = \(a, _) -> a
   exr = \(_, b) -> b
   dup = \a -> (a, a)
 
-instance Closed (->) where
-  apply (f, a) = f a
-  curry f      = \a b -> f (a, b)
-  uncurry f    = \(a, b) -> f a b
-
 instance Num a => NumCat (->) a where
   negateC = negate
   addC = uncurry (+)
   mulC = uncurry (*)
-  
+
+instance Floating a => FloatCat (->) a where
+  expC = exp
+
 
 -------------------------------------
 
 instance {-# OVERLAPS #-} (Num a) => Additive a where
   zero = 0
-  one = 1
   (^+) = (+)
 
 instance {-# OVERLAPS #-} (Additive a, Additive b) => Additive (a, b) where
   zero = (zero, zero)
-  one = (one, one)
   (a1, b1) ^+ (a2, b2) = (a1 ^+ a2, b1 ^+ b2)
-
 
 
 inlF :: Additive b => a -> (a, b)
@@ -159,3 +144,20 @@ jamF :: Additive a => (a, a) -> a
 inlF = \a -> (a, zero)
 inrF = \b -> (zero, b)
 jamF = \(a, b) -> a ^+ b
+
+-------------------------------------
+
+type Allowed2 k a b = (Allowed k a, Allowed k b)
+type Allowed3 k a b c = (Allowed2 k a b, Allowed k c)
+type Allowed4 k a b c d = (Allowed3 k a b c, Allowed k d)
+type Allowed5 k a b c d e = (Allowed4 k a b c d, Allowed k e)
+type Allowed6 k a b c d e f = (Allowed5 k a b c d e, Allowed k f)
+
+type Additive2 a b = (Additive a, Additive b)
+type Additive3 a b c = (Additive2 a b, Additive c)
+type Additive4 a b c d = (Additive3 a b c, Additive d)
+type Additive5 a b c d e = (Additive4 a b c d, Additive e)
+type Additive6 a b c d e f = (Additive5 a b c d e, Additive f)
+type Additive7 a b c d e f g = (Additive6 a b c d e f, Additive g)
+type Additive8 a b c d e f g h = (Additive7 a b c d e f g, Additive h)
+type Additive9 a b c d e f g h i = (Additive8 a b c d e f g h , Additive i)

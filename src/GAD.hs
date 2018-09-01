@@ -17,13 +17,15 @@
              NoMonomorphismRestriction,
              TypeFamilies,
              UndecidableInstances,
-             GeneralizedNewtypeDeriving
+             GeneralizedNewtypeDeriving,
+             AllowAmbiguousTypes
                             #-}
 
-module ConalAD where
+module GAD where
 
 import Prelude hiding (id, (.), curry, uncurry)
 import qualified Prelude as P
+import Control.Comonad
 --import Numeric.LinearAlgebra.Array
 --import Numeric.LinearAlgebra.Array.Util
 
@@ -33,18 +35,15 @@ import Dual
 import Cont
 
 newtype GADType k a b = GAD {
-  evalGAD :: a -> (b, a `k` b) 
+  evalGAD :: a -> (b, a `k` b)
 }
 
-newtype DType a b = D {
-  evalD :: GADType DType a b
-}
+type LinType a b = GADType (->+) a b
 
-type BackpropType a b = GADType (DualType (->+)) a b
+type DType a b = GADType (DualType (->+)) a b
 
 linearD :: (a -> b) -> (a `k` b) -> GADType k a b
-linearD f f' = GAD $ \x -> (f x, f') 
-
+linearD f f' = GAD $ \x -> (f x, f')
 
 instance Category k => Category (GADType k) where
   type Allowed (GADType k) a = (Additive a, Allowed k a)
@@ -58,6 +57,9 @@ instance Monoidal k => Monoidal (GADType k) where
   GAD f `x` GAD g = GAD $ \(a, b) -> let (c, f') = f a
                                          (d, g') = g b
                                      in ((c, d), f' `x` g')
+  assocL = linearD assocL assocL
+  assocR = linearD assocR assocR
+  swap = linearD swap swap
 
 instance Cartesian k => Cartesian (GADType k) where
   type AllowedCar (GADType k) a = AllowedCar k a
@@ -73,37 +75,17 @@ instance Cocartesian k => Cocartesian (GADType k) where
   inr = linearD inrF inr
   jam = linearD jamF jam
 
---instance Scalable k s => (GADType k) where
-  
-instance (Num s, NumCat k s, Scalable k s) => NumCat (GADType k) s where
-  negateC = linearD negateC negateC
-  addC = linearD addC addC
-  mulC = undefined
-  --mulC = GAD $ \(a, b) -> (a * b, scale b \/ scale a) -- \/ has a bunch of extra constraints?
+-- Can the set of these constraints be shortened?
+-- negateC and addC differ from paper; 2nd argument to linearD is changed so the constraint NumCat k s isn't needed anymore
+instance (Num s, Scalable k s, Monoidal k, Cocartesian k,
+          Allowed k (s, s), Allowed k s, AllowedCoCar k s) => NumCat (GADType k) s where
+  negateC = linearD negateC (scale (-1)) -- this is where
+  addC = linearD addC jam
+  mulC = GAD $ \(a, b) -> (a * b, scale b \/ scale a) -- most of the instance constraints come from \/
 
-ttt :: (GADType k a b, a) `k` b
-ttt = undefined
-
-applyk :: (a `k` b, a) `k` b
-applyk = undefined
-
-instance Closed k => Closed (GADType k) where
-  apply :: (GADType k a b, a) -> b
-  apply (GAD op, a) = fst $ op a
-
---  curry :: GADType k (a, b) c -> GADType k a (GADType k b c)
---  curry d@(GAD op) = GAD $ \a -> (GAD $ \b -> let (c, op') = op (a, b)
---                                            in (c, apply (curry op', a)), df (curry d) a)
---
---  uncurry :: GADType k a (GADType k b c) -> GADType k (a, b) c
---  uncurry d = GAD $ \(a, b) -> let c = apply (apply (d, a), b)
---                               in (c, df (uncurry d) (a, b))
-
-xx :: (a, b) `k` c
-xx = undefined
-
-ucurapply :: GADType k a (GADType k b c) -> (a, b) -> c
-ucurapply g = \(a, b) -> f (f g a) b
+instance (Floating s, FloatCat k s, Scalable k s) => FloatCat (GADType k) s where
+  expC = GAD $ \a -> let e = exp a
+                     in (e, scale e)
 
 f :: GADType k a b -> a -> b
 f (GAD op) = fst . op
@@ -111,18 +93,29 @@ f (GAD op) = fst . op
 df :: GADType k a b -> a -> k a b
 df (GAD op) = snd . op
 
-
---mul :: (Additive a, Num a) => BackpropType (a, a) a
-mul = GAD $ \(a, b) -> (a * b, scale b \/ scale a)
-
-expC :: (Floating a, Scalable k a) => GADType k a a
-expC = GAD $ \a -> let e = exp a
-                   in (e, scale e)
-
-emul = df mul (2, 3)
-
 sqr :: (Additive a, Num a) => GADType (DualType (->+)) a a
-sqr = mul . dup
+sqr = mulC . dup
 
 myf :: (Additive a, Floating a) => GADType (DualType (->+)) a a
 myf = expC . sqr
+
+sv :: (Additive a, Num a) => a -> a
+sv = f sqr
+
+dsv :: (Additive a, Num a) => a -> DualType (->+) a a
+dsv = df sqr
+
+m :: (Num a, Additive a) => GADType (DualType (->+)) (a, a) a
+m = mulC
+
+dm :: (Num a, Additive a) => (a, a) -> DualType (->+) (a, a) a
+dm = df mulC
+
+a :: (Num a, Additive a) => DualType (->+) (a, a) a
+a = dm (2, 3)
+
+b :: (Num a, Additive a) => a ->+ (a, a)
+b = evalDual a
+
+c :: (Num a, Additive a) => a -> (a, a)
+c = evalAF b

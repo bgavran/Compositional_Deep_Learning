@@ -16,7 +16,8 @@
              RankNTypes,
              NoMonomorphismRestriction,
              TypeFamilies,
-             UndecidableInstances 
+             UndecidableInstances,
+             GeneralizedNewtypeDeriving
                             #-}
 
 module Dual where
@@ -36,8 +37,11 @@ instance Category k => Category (DualType k) where
   id = Dual id
   Dual g . Dual f = Dual (f . g)
 
-instance Monoidal k => Monoidal (DualType k) where 
+instance Monoidal k => Monoidal (DualType k) where
   Dual f `x` Dual g = Dual (f `x` g)
+  assocL = Dual assocR
+  assocR = Dual assocL
+  swap = Dual swap
 
 instance (Cartesian k, Cocartesian k) => Cartesian (DualType k) where
   type AllowedCar (DualType k) a = AllowedCoCar k a
@@ -55,3 +59,6 @@ instance Cartesian k => Cocartesian (DualType k) where
 
 instance Scalable k a => Scalable (DualType k) a where
   scale s = Dual (scale s)
+
+instance FloatCat k s => FloatCat (DualType k) s where
+  expC = Dual expC
