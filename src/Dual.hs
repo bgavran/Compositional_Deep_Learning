@@ -41,6 +41,10 @@ instance Monoidal k => Monoidal (DualType k) where
   Dual f `x` Dual g = Dual (f `x` g)
   assocL = Dual assocR
   assocR = Dual assocL
+  --unitorL = Dual unitorL'
+  --unitorL' = Dual unitorL
+  --unitorR = Dual unitorR'
+  --unitorR' = Dual unitorR
   swap = Dual swap
 
 instance (Cartesian k, Cocartesian k) => Cartesian (DualType k) where
@@ -49,6 +53,7 @@ instance (Cartesian k, Cocartesian k) => Cartesian (DualType k) where
   exl = Dual inl
   exr = Dual inr
   dup = Dual jam
+  counit = Dual unit
 
 instance Cartesian k => Cocartesian (DualType k) where
   type AllowedCoCar (DualType k) a = AllowedCar k a
@@ -56,6 +61,7 @@ instance Cartesian k => Cocartesian (DualType k) where
   inl = Dual exl
   inr = Dual exr
   jam = Dual dup
+  unit = Dual counit
 
 instance Scalable k a => Scalable (DualType k) a where
   scale s = Dual (scale s)

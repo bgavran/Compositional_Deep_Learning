@@ -26,6 +26,7 @@ import qualified Prelude as P
 
 import CategoricDefinitions
 
+-- OUTDATED; I need to update this!
 newtype ContType k r a b = Cont ( (b `k` r) -> (a `k` r)) -- a -> b -> r
 
 cont :: (Category k, Allowed3 k a b r) => (a `k` b) -> ContType k r a b
@@ -37,18 +38,6 @@ instance Category k => Category (ContType k r) where
   Cont g . Cont f = Cont (f . g)
 
 --instance Monoidal k => Monoidal (ContType k r) where
---  type AllowedMon (ContType k r) a b c d = (AllowedSeq k (a, b) (r, r) r, 
---                                            AllowedSeq k c (c, d) r,
---                                            AllowedSeq k d (c, d) r,
---                                            AllowedMon k a b r r, 
---                                            Allowed k r, 
---                                            Allowed k c,
---                                            Allowed k d,
---                                            AllowedCoCarJam k r,
---                                            AllowedCoCarIn k c d,
---                                            AllowedCoCarIn k d c,
---                                            Cocartesian k
---                                            )
 --  (Cont f) `x` (Cont g) = Cont $ join . (f `x` g) . unjoin
 --
 --instance Cartesian k => Cartesian (ContType k r) where
