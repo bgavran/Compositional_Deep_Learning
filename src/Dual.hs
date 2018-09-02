@@ -64,7 +64,10 @@ instance Cartesian k => Cocartesian (DualType k) where
   unit = Dual counit
 
 instance Scalable k a => Scalable (DualType k) a where
-  scale s = Dual (scale s)
+  scale s = Dual (scale s) -- is this okay? maybe scale 1/s?
 
 instance FloatCat k s => FloatCat (DualType k) s where
   expC = Dual expC
+
+instance FractCat k s => FractCat (DualType k) s where
+  recipC = Dual recipC

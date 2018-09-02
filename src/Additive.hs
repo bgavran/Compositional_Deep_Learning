@@ -65,9 +65,13 @@ instance Num a => NumCat (->+) a where
   negateC = AddFun negateC
   addC = AddFun addC
   mulC = AddFun mulC
+  increaseC a = AddFun (increaseC a)
 
 instance Floating a => FloatCat (->+) a where
   expC = AddFun expC
+
+instance Fractional a => FractCat (->+) a where
+  recipC = AddFun recipC
 
 -----------------------------
 

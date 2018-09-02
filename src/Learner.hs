@@ -1,4 +1,4 @@
-{-#r LANGUAGE 
+{-# LANGUAGE 
              EmptyCase,
              FlexibleInstances,
              FlexibleContexts,
@@ -16,7 +16,7 @@
              RankNTypes,
              NoMonomorphismRestriction,
              TypeFamilies,
-             UndecidableInstances 
+             UndecidableInstances
                             #-}
 
 module Learner where
@@ -25,21 +25,15 @@ import Prelude hiding (id, (.), curry, uncurry)
 import qualified Prelude as P
 
 import CategoricDefinitions
-import AD
+import GAD
+import Para
 
---------------------------------------
---
---type ZF p = Z p
---type ImplReqF p a b = ParaType p a b
---type UpdF p = (Z p, Z p) -> Z p
---type CostF b = DType (b, b) b -- (Predicted, True) - first is the output of the ir function, second one comes from learner 2
---
---data Learner p a b = L {
---  param :: ZF p,
---  implreq  :: ImplReqF p a b,
---  upd   :: UpdF p,
---  cost  :: CostF b
---}
+data LearnerType p a b = Learner {
+  param :: PType p,
+  implreq  :: ParaType p a b,
+  upd   :: (PType p, PType p) -> PType p,
+  cost  :: DType (a, a) b
+}
 --
 --costGrad :: CostF b -> b
 --costGrad = undefined
@@ -47,11 +41,10 @@ import AD
 ---- cost fn requires continuations!
 --trivialCost :: CostF b
 --trivialCost = D $ \(b, b') -> (undefined, undefined)
---
---instance Category (Learner p) where
---  type Allowed (Learner p) x = AllowedPara p x
---  type AllowedSeq (Learner p) a b c = AllowedParaComp p a b c
---
+
+--instance Category (LearnerType p) where
+--  type Allowed (LearnerType p) a = Allowed (ParaType p) a
+
 --  id = L {param = NoP,
 --          implreq = id,
 --          upd    = \_ -> NoP,

@@ -79,9 +79,13 @@ class NumCat k a where
   negateC :: a `k` a
   addC :: (a, a) `k` a
   mulC :: (a, a) `k` a
+  increaseC :: a -> a `k` a -- curried add, add a single number
 
 class FloatCat k a where
   expC :: a `k` a
+
+class FractCat k a where
+  recipC :: a `k` a
 
 class Scalable k a where
   scale :: a -> (a `k` a)
@@ -118,16 +122,15 @@ instance Num a => NumCat (->) a where
   negateC = negate
   addC = uncurry (+)
   mulC = uncurry (*)
+  increaseC a = (+a)
 
 instance Floating a => FloatCat (->) a where
   expC = exp
 
+instance Fractional a => FractCat (->) a where
+  recipC = recip
 
 -------------------------------------
-
---instance {-# OVERLAPS #-} Additive () where
---  zero = ()
---  () ^+ () = ()
 
 instance {-# OVERLAPS #-} (Num a) => Additive a where
   zero = 0

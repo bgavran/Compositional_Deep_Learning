@@ -84,10 +84,15 @@ instance (Num s, Scalable k s, Monoidal k, Cocartesian k,
   negateC = linearD negateC (scale (-1)) -- this is where this differs from SimpleAD paper
   addC = linearD addC jam
   mulC = GAD $ \(a, b) -> (a * b, scale b \/ scale a) -- most of the instance constraints come from \/
+  increaseC a = linearD (increaseC a) id
 
 instance (Floating s, FloatCat k s, Scalable k s) => FloatCat (GADType k) s where
   expC = GAD $ \a -> let e = exp a
                      in (e, scale e)
+
+instance (Fractional s, FractCat k s, Scalable k s) => FractCat (GADType k) s where
+  recipC = GAD $ \a -> let r = recip a
+                       in (r, scale (-r*r))
 
 fGAD :: GADType k a b -> a -> b
 fGAD (GAD op) = fst . op

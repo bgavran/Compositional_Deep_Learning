@@ -50,9 +50,13 @@ instance Num s => NumCat DType s where
   negateC = D negateC
   addC = D addC
   mulC = D mulC
+  increaseC a = D $ increaseC a
 
 instance Floating s => FloatCat DType s where
   expC = D expC
+
+instance Fractional s => FractCat DType s where
+  recipC = D recipC
 
 ----------------------------------
 
@@ -60,6 +64,11 @@ data PType p
   = P p
   | (PType p) `X` (PType p)
   deriving (Eq, Show, Functor)
+
+instance {-# OVERLAPS #-} Additive p => Additive (PType p) where
+  zero = P zero
+  (P p1) ^+ (P p2) = P (p1 ^+ p2)
+  (p1 `X` q1) ^+ (p2 `X` q2) = (p1 ^+ p2) `X` (q1 ^+ q2)
 
 -- there is this problem of no dependent types in haskell which the following function highlights
 -- With dependent types it should be possible to tell that we can only convert to tuple something that's a _product_, not a normal value
@@ -69,7 +78,22 @@ toTuple (p `X` q) = (p, q)
 toTuple (P p) = error "nope!"
 
 dToTuple :: DType (PType p) (PType p, PType p)
-dToTuple = D $ linearD toTuple (Dual (AddFun (uncurry X)))
+dToTuple = D $ linearD toTuple (Dual (AddFun (uncurry X))) -- duplicate from Comonad?
+
+extractP :: PType p -> p
+extractP (P p) = p
+
+dToP :: DType a (PType a)
+dToP = D $ linearD P (Dual (AddFun extractP)) -- extract from Comonad?
+
+leftToP :: Additive2 p a => DType (p, a) (PType p, a)
+leftToP = (dToP `x` id)
+
+dFromP :: DType (PType p) p
+dFromP = D $ linearD extractP (Dual (AddFun P))
+
+leftFromP :: Additive2 p a => DType (PType p, a) (p, a)
+leftFromP = (dFromP `x` id)
 
 {-
 Swap map for mon. product of parametrized functions, from top to bottom
@@ -87,49 +111,22 @@ swapParam = assocR . (id `x` assocL) . (id `x` (swap `x` id)) . (id `x` assocR) 
 
 ----------------------------------
 
-newtype Para p a b = Para {
+newtype ParaType p a b = Para {
   evalPara :: DType (PType p, a) b
 }
 
-
-instance Category (Para p) where
-  type Allowed (Para p) a = Allowed2 (DType) (PType p) a
+instance Category (ParaType p) where
+  type Allowed (ParaType p) a = Allowed2 (DType) (PType p) a
 
   id = Para exr
   (Para g) . (Para f) = Para $ (g `comp` f) . (dToTuple `x` id)
 
 
-instance Monoidal (Para p) where
+instance Monoidal (ParaType p) where
   (Para f) `x` (Para g) = Para $ (f `x` g) . swapParam . (dToTuple `x` id)
   assocL = Para $ exr . (id `x` assocL) -- also possible: (unitorL . (counit `x` assocR)), which is better?
   assocR = Para $ exr . (id `x` assocR)
   swap = Para $ exr . (id `x` swap)
-
-fp :: Para p a b -> (PType p, a) -> b
-fp = fGAD . evalDType . evalPara
-
-dfp :: Para p a b -> (PType p, a) -> b -> (PType p, a)
-dfp para inp = evalGrad $ (dfGAD . evalDType . evalPara) para inp
-
-f :: DType a b -> a -> b
-f = fGAD . evalDType
-
-df :: DType a b -> a -> b -> a
-df para inp = evalGrad $ (dfGAD . evalDType) para inp
-
-myf :: (Additive a, Floating a) => DType (a, a) a
-myf = jam . (expC `x` mulC) . assocL . (dup `x` id)
-
-
-
-
-
-
-
-
-
-
-
 
 
 
