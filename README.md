@@ -1,16 +1,33 @@
 ### Functional Deep Learning
 
 This is my attempt to [continue](https://github.com/bgavran/autodiff) formalizing and understanding neural networks from the first principles.
+It's a categorical approach to organizing and layering different abstractions found in neural networks:
+* Differentiation of composition of functions (forward mode, reverse mode)
+* Notion of composition of *parametrized* functions
+* Notion of a cost function (fixed or adversarial)
+* Notion of an update rule
 
-It started as a Haskell implementation of the [Backprop as Functor](https://arxiv.org/abs/1711.10455) paper which is an intriguing approach to neural networks from the perspective of Category Theory.
+Most of the work in this repository is inspired by two recent papers:
 
-In the meantime there have been a few papers that started talking about similar things!
+* [The simple essence of automatic differentiation](http://conal.net/papers/essence-of-ad/)
+* [Backprop as Functor](https://arxiv.org/abs/1711.10455)
 
-[a) The simple essence of automatic differentiation](http://conal.net/papers/essence-of-ad/)
+They're talking about similar things in the language of category theory, albeit in a slightly different way. My goal is to reconcile their work and expand on it.
 
-[b) Demystifying Differentiable Programming: Shift/Reset the Penultimate Backpropagator](https://arxiv.org/abs/1803.10228)
+----
 
-Both a) and b) talk about implementation of generalized reverse-mode AD in a purely functional context.
-My [previous](https://github.com/bgavran/autodiff) attempt in implementing such a system relied heavily on the concept of a computational graph, which seems to have been rendered obsolete by these amazing approaches.
+Progress so far:
+* Main parts of SimpleAD paper are fully implemented
+  * Generalized, mode-independent automatic differentiation with rudimentary functions
+  * Backpropagation (which is *just a specialization of GAD to the dual category of additive functions*)
+* Implemented category **Para** from BackpropFunctor
+* **Novel**: Implemented **Para** in terms of **GAD**, making _request_ function from BackpropFunctor obsolete
 
-The `src` directory currently consists of various files with implementations of `Backprop as Functor` and `The simple essence of automatic differentiation` papers, together with my experiments.
+
+**TODO**:
+* Implement derivatives of general tensor contraction operations using Einstein notation
+* Port this to Idris - dependent types seem needed for properly implementing **Para** as a category
+* Provide working examples of training simple neural networks
+
+
+This is a heavy work in progress, but feel free to send me an email with any questions you might have!
