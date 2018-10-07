@@ -1,25 +1,3 @@
-{-# LANGUAGE 
-             EmptyCase,
-             FlexibleInstances,
-             FlexibleContexts,
-             InstanceSigs,
-             MultiParamTypeClasses,
-             PartialTypeSignatures,
-             LambdaCase,
-             MultiWayIf,
-             NamedFieldPuns,
-             TupleSections,
-             DeriveFunctor,
-             TypeOperators,
-             ScopedTypeVariables,
-             ConstraintKinds,
-             RankNTypes,
-             NoMonomorphismRestriction,
-             TypeFamilies,
-             UndecidableInstances,
-             GeneralizedNewtypeDeriving
-                            #-}
-
 module Train where
 
 import Prelude hiding (id, (.))
@@ -29,7 +7,6 @@ import Prelude hiding (id, (.))
 import CategoricDefinitions
 import GAD
 import Para
-
 
 fp :: ParaType p a b -> (PType p, a) -> b
 fp = fGAD . evalDType . evalPara
@@ -50,7 +27,7 @@ myf = jam . (expC `x` mulC) . assocL . (dup `x` id)
 -------------------------------------------
 
 sigmoid :: (Additive a, Floating a) => DType a a
-sigmoid = recipC . (increaseC 1) . expC . negateC
+sigmoid = recipC . increaseC 1 . expC . negateC
 
 p1 :: (Additive a, Num a) => ParaType a a a
 p1 = Para (mulC . leftFromP)
@@ -61,10 +38,8 @@ p2 = Para (addC . leftFromP)
 p3 :: (Additive a, Num a) => ParaType a a a
 p3 = p2 . p1 -- composing two parametrized functions
 
-output = fp p3 ((P 2) `X` (P 3), 7)
+output :: Double
+output = fp p3 (P 2 `X` P 3, 7)
 
-derivativeOutput = dfp p3 ((P 2) `X` (P 3), 7) 1
-
-
-
-
+derivativeOutput :: (PType Double, Double)
+derivativeOutput = dfp p3 (P 2 `X` P 3, 7) 1

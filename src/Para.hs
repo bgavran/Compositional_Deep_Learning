@@ -1,50 +1,18 @@
-{-# LANGUAGE 
-             EmptyCase,
-             FlexibleInstances,
-             FlexibleContexts,
-             InstanceSigs,
-             MultiParamTypeClasses,
-             PartialTypeSignatures,
-             LambdaCase,
-             MultiWayIf,
-             NamedFieldPuns,
-             TupleSections,
-             DeriveFunctor,
-             TypeOperators,
-             ScopedTypeVariables,
-             ConstraintKinds,
-             RankNTypes,
-             NoMonomorphismRestriction,
-             TypeFamilies,
-             UndecidableInstances,
-             GeneralizedNewtypeDeriving
-                            #-}
-
 module Para where
 
 import Prelude hiding (id, (.))
-import Control.Comonad
 
 import CategoricDefinitions
 import GAD
 import Dual
 import Additive
 
--- perhaps this class isn't even needed
-class Monoidal k => Parametrizable k where
-  comp :: (Allowed k ((p, q), a), Allowed k ((q, p), a), Allowed k c, Allowed k (q, (p, a)), Allowed k (q, b), Allowed k q,
-      Allowed k (p, a), Allowed k b, Allowed k p, Allowed k a, Allowed k (q, p), Allowed k (p, q))
-          => (q, b) `k` c -> (p, a) `k` b -> ((p, q), a) `k` c
-
-
-instance Monoidal k => Parametrizable (GADType k) where
-  g `comp` f = g . (id `x` f) . assocL . (swap `x` id)
 
 ----------------------------------
 
 newtype DType a b = D {
   evalDType :: GADType (DualType (->+)) a b
-} deriving (Category, Monoidal, Cartesian, Cocartesian, Parametrizable)
+} deriving (Category, Monoidal, Cartesian, Cocartesian)
 
 instance Num s => NumCat DType s where
   negateC = D negateC
@@ -70,9 +38,6 @@ instance {-# OVERLAPS #-} Additive p => Additive (PType p) where
   (P p1) ^+ (P p2) = P (p1 ^+ p2)
   (p1 `X` q1) ^+ (p2 `X` q2) = (p1 ^+ p2) `X` (q1 ^+ q2)
 
--- there is this problem of no dependent types in haskell which the following function highlights
--- With dependent types it should be possible to tell that we can only convert to tuple something that's a _product_, not a normal value
--- how far away is this from the COMONAD idea? 'duplcate' was the previos name
 toTuple :: PType p -> (PType p, PType p)
 toTuple (p `X` q) = (p, q)
 toTuple (P p) = error "nope!"
@@ -87,13 +52,13 @@ dToP :: DType a (PType a)
 dToP = D $ linearD P (Dual (AddFun extractP)) -- extract from Comonad?
 
 leftToP :: Additive2 p a => DType (p, a) (PType p, a)
-leftToP = (dToP `x` id)
+leftToP = dToP `x` id
 
 dFromP :: DType (PType p) p
 dFromP = D $ linearD extractP (Dual (AddFun P))
 
 leftFromP :: Additive2 p a => DType (PType p, a) (p, a)
-leftFromP = (dFromP `x` id)
+leftFromP = dFromP `x` id
 
 {-
 Swap map for mon. product of parametrized functions, from top to bottom
@@ -103,11 +68,13 @@ a ((b, c), d)
 a ((c, b), d)
 a (c, (b, d))
 (a c) (b d)
-
-(Monoidal k, aBunchOfConstraints) =>
-swapParam :: ((a, b), (c, d)) `k` ((a, c), (b, d))
 -}
+
+swapParam :: (Monoidal k, _) => ((a, b), (c, d)) `k` ((a, c), (b, d))
 swapParam = assocR . (id `x` assocL) . (id `x` (swap `x` id)) . (id `x` assocR) .  assocL
+
+comp :: (_) => (q, b) `k` c -> (p, a) `k` b -> ((p, q), a) `k` c
+g `comp` f = g . (id `x` f) . assocL . (swap `x` id)
 
 ----------------------------------
 
@@ -116,7 +83,7 @@ newtype ParaType p a b = Para {
 }
 
 instance Category (ParaType p) where
-  type Allowed (ParaType p) a = Allowed2 (DType) (PType p) a
+  type Allowed (ParaType p) a = Allowed2 DType (PType p) a
 
   id = Para exr
   (Para g) . (Para f) = Para $ (g `comp` f) . (dToTuple `x` id)
@@ -130,27 +97,11 @@ instance Monoidal (ParaType p) where
 
 
 
-
-
-
-
 {-
 -- this is partially defined?
 instance Comonad Z where
   extract (P p) = p
   duplicate (P p) = P (P p)
-
-class Parametrizable k where
-  fromZ :: (Z a) `k` a
-
-instance Parametrizable (->+) where
-  fromZ = AddFun extract
-
-instance Parametrizable k => Parametrizable (GADType k) where
-  fromZ = linearD extract fromZ
-
---fromZ :: GADType (->+) (Z a) a
---fromZ = linearD extract (AddFun extract)
 
 dFunctor :: Additive3 p a b => DType a b -> DType (p, a) (p, b)
 dFunctor (GAD f) = GAD $ \(p, a) -> let (b, f') = f a

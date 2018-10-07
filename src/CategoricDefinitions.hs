@@ -1,25 +1,3 @@
-{-# LANGUAGE 
-             EmptyCase,
-             FlexibleInstances,
-             FlexibleContexts,
-             InstanceSigs,
-             MultiParamTypeClasses,
-             PartialTypeSignatures,
-             LambdaCase,
-             MultiWayIf,
-             NamedFieldPuns,
-             TupleSections,
-             DeriveFunctor,
-             TypeOperators,
-             ScopedTypeVariables,
-             ConstraintKinds,
-             RankNTypes,
-             NoMonomorphismRestriction,
-             TypeFamilies,
-             UndecidableInstances,
-             GeneralizedNewtypeDeriving
-                            #-}
-
 module CategoricDefinitions where
 
 import Prelude hiding (id, (.))
@@ -152,26 +130,20 @@ type Allowed7 k a b c d e f g = (Allowed6 k a b c d e f, Allowed k g)
 type Allowed8 k a b c d e f g h = (Allowed7 k a b c d e f g, Allowed k h)
 type Allowed9 k a b c d e f g h i = (Allowed8 k a b c d e f g i, Allowed k i)
 
---(/\) :: (Cartesian k, Allowed k b, Allowed k (b, b), Allowed k (c, d))
---     => b `k` c -> b `k` d -> b `k` (c, d)
+(/\) :: (Cartesian k, _) => b `k` c -> b `k` d -> b `k` (c, d)
 f /\ g = (f `x` g) . dup
 
---(\/) :: (Cocartesian k, Monoidal k, Allowed k (a, b), Allowed k (c, c), Allowed k c)
---     => a `k` c -> b `k` c -> (a, b) `k` c
+(\/) :: (Monoidal k, Cocartesian k, _) => a `k` c -> b `k` c -> (a, b) `k` c
 f \/ g = jam . (f `x` g)
 
---fork :: (Cartesian k, Allowed k b, Allowed k (b, b), Allowed k (c, d))
---     => (b `k` c,  b `k` d) -> b `k` (c, d)
+fork :: (Cartesian k, _) => (b `k` c,  b `k` d) -> b `k` (c, d)
 fork (f, g) = f /\ g
 
---unfork :: (Cartesian k, Allowed k b, Allowed k (c, d), Allowed k c, Allowed k d)
---       => b `k` (c, d) -> (b `k` c, b `k` d)
+unfork :: (Cartesian k, _) => b `k` (c, d) -> (b `k` c, b `k` d)
 unfork h = (exl . h, exr . h)
 
---join :: (Cocartesian k, Monoidal k, Allowed k (a, b), Allowed k (c, c), Allowed k c) 
---     => (a `k` c, b `k` c) -> (a, b) `k` c
+join :: (Monoidal k, Cocartesian k, _) => (a `k` c, b `k` c) -> (a, b) `k` c
 join (f, g) = f \/ g
 
---unjoin :: (Cocartesian k, Monoidal k, Allowed k a, Allowed k (a, b), Allowed k c, Allowed k b)
---       => (a, b) `k` c -> (a `k` c, b `k` c) 
+unjoin :: (Cocartesian k, _) => (a, b) `k` c -> (a `k` c, b `k` c) 
 unjoin h = (h . inl, h . inr)

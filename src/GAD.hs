@@ -1,36 +1,13 @@
-{-# LANGUAGE 
-             EmptyCase,
-             FlexibleInstances,
-             FlexibleContexts,
-             InstanceSigs,
-             MultiParamTypeClasses,
-             PartialTypeSignatures,
-             LambdaCase,
-             MultiWayIf,
-             NamedFieldPuns,
-             TupleSections,
-             DeriveFunctor,
-             TypeOperators,
-             ScopedTypeVariables,
-             ConstraintKinds,
-             RankNTypes,
-             NoMonomorphismRestriction,
-             TypeFamilies,
-             UndecidableInstances,
-             GeneralizedNewtypeDeriving
-                            #-}
-
 module GAD where
 
-import Prelude hiding (id, (.))
-import Control.Comonad
+import           Prelude              hiding (id, (.))
 --import Numeric.LinearAlgebra.Array
 --import Numeric.LinearAlgebra.Array.Util
 
-import CategoricDefinitions
-import Additive
-import Dual
-import Cont
+import           Additive
+import           CategoricDefinitions
+import           Cont
+import           Dual
 
 newtype GADType k a b = GAD {
   evalGAD :: a -> (b, a `k` b)

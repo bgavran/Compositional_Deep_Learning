@@ -1,25 +1,3 @@
-{-# LANGUAGE 
-             EmptyCase,
-             FlexibleInstances,
-             FlexibleContexts,
-             InstanceSigs,
-             MultiParamTypeClasses,
-             PartialTypeSignatures,
-             LambdaCase,
-             MultiWayIf,
-             NamedFieldPuns,
-             TupleSections,
-             DeriveFunctor,
-             TypeOperators,
-             ScopedTypeVariables,
-             ConstraintKinds,
-             RankNTypes,
-             NoMonomorphismRestriction,
-             TypeFamilies,
-             UndecidableInstances,
-             GeneralizedNewtypeDeriving
-                            #-}
-
 module Additive where
 
 import Prelude hiding (id, (.))

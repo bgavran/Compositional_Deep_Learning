@@ -1,32 +1,13 @@
-{-# LANGUAGE 
-             EmptyCase,
-             FlexibleInstances,
-             FlexibleContexts,
-             InstanceSigs,
-             MultiParamTypeClasses,
-             PartialTypeSignatures,
-             LambdaCase,
-             MultiWayIf,
-             NamedFieldPuns,
-             TupleSections,
-             DeriveFunctor,
-             TypeOperators,
-             ScopedTypeVariables,
-             ConstraintKinds,
-             RankNTypes,
-             NoMonomorphismRestriction,
-             TypeFamilies,
-             UndecidableInstances 
-                            #-}
-
+module Ops where
 
 import Prelude hiding (id, (.), curry, uncurry)
 import qualified Prelude as P
-import Numeric.LinearAlgebra.Array
-import Numeric.LinearAlgebra.Array.Util
+--import Numeric.LinearAlgebra.Array
+--import Numeric.LinearAlgebra.Array.Util
 
+{-
 import CategoricDefinitions
-import AD
+import GAD
 import Learner
 
 sgd :: (Num p, Fractional p) => p -> p -> p
@@ -141,3 +122,5 @@ sh t3 = [[6, 6, 6, 6, 6],
 ----        in f (Cat.curry mul) s
 --
 --
+
+-}
