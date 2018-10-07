@@ -1,7 +1,7 @@
 ### Functional Deep Learning
 
-This is my attempt to [continue](https://github.com/bgavran/autodiff) formalizing and understanding neural networks from the first principles.
-It's a categorical approach to organizing and layering different abstractions found in neural networks:
+This is my attempt to [continue](https://github.com/bgavran/autodiff) formalizing and understanding neural networks in the language of category theory.
+It's a compositional approach to organizing and layering different abstractions found in neural networks:
 * Differentiation of composition of functions (forward mode, reverse mode)
 * Notion of composition of *parametrized* functions
 * Notion of a cost function (fixed or adversarial)
@@ -26,7 +26,6 @@ Progress so far:
 
 **TODO**:
 * Implement derivatives of general tensor contraction operations using Einstein notation
-* Port this to Idris - dependent types seem needed for properly implementing **Para** as a category
 * Provide working examples of training simple neural networks
 
 
