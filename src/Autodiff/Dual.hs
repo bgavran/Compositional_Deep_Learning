@@ -1,4 +1,4 @@
-module Dual where
+module Autodiff.Dual where
 
 import Prelude hiding (id, (.), curry, uncurry)
 import qualified Prelude as P

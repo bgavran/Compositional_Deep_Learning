@@ -1,4 +1,4 @@
-module Additive where
+module Autodiff.Additive where
 
 import Prelude hiding (id, (.))
 import qualified Prelude as P
@@ -10,46 +10,46 @@ newtype a ->+ b = AddFun {
 }
 
 instance Category (->+) where
-  type Allowed (->+) a = Additive a
-  id = AddFun id
-  AddFun g . AddFun f = AddFun (g . f)
+    type Allowed (->+) a = Additive a
+    id = AddFun id
+    AddFun g . AddFun f = AddFun (g . f)
 
 instance Monoidal (->+) where
-  AddFun f `x` AddFun g = AddFun (f `x` g)
-  assocL = AddFun assocL
-  assocR = AddFun assocR
-  --unitorL = AddFun unitorL
-  --unitorL' = AddFun unitorL'
-  --unitorR = AddFun unitorR
-  --unitorR' = AddFun unitorR'
-  swap = AddFun swap
+    AddFun f `x` AddFun g = AddFun (f `x` g)
+    assocL = AddFun assocL
+    assocR = AddFun assocR
+    --unitorL = AddFun unitorL
+    --unitorL' = AddFun unitorL'
+    --unitorR = AddFun unitorR
+    --unitorR' = AddFun unitorR'
+    swap = AddFun swap
 
 instance Cartesian (->+) where
-  exl = AddFun exl
-  exr = AddFun exr
-  dup = AddFun dup
-  counit = AddFun counit
+    exl = AddFun exl
+    exr = AddFun exr
+    dup = AddFun dup
+    counit = AddFun counit
 
 instance Cocartesian (->+) where
-  inl = AddFun inlF
-  inr = AddFun inrF
-  jam = AddFun jamF
-  unit = AddFun unitF
+    inl = AddFun inlF
+    inr = AddFun inrF
+    jam = AddFun jamF
+    unit = AddFun unitF
 
 instance Num a => Scalable (->+) a where
-  scale a = AddFun (*a)
+    scale a = AddFun (*a)
 
 instance Num a => NumCat (->+) a where
-  negateC = AddFun negateC
-  addC = AddFun addC
-  mulC = AddFun mulC
-  increaseC a = AddFun (increaseC a)
+    negateC = AddFun negateC
+    addC = AddFun addC
+    mulC = AddFun mulC
+    increaseC a = AddFun (increaseC a)
 
 instance Floating a => FloatCat (->+) a where
-  expC = AddFun expC
+    expC = AddFun expC
 
 instance Fractional a => FractCat (->+) a where
-  recipC = AddFun recipC
+    recipC = AddFun recipC
 
 -----------------------------
 

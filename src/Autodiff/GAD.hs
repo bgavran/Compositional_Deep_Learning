@@ -1,13 +1,10 @@
-module GAD where
+module Autodiff.GAD where
 
-import           Prelude              hiding (id, (.))
---import Numeric.LinearAlgebra.Array
---import Numeric.LinearAlgebra.Array.Util
-
-import           Additive
-import           CategoricDefinitions
-import           Cont
-import           Dual
+import Prelude hiding (id, (.))
+import CategoricDefinitions
+import Autodiff.Additive
+import Autodiff.Cont
+import Autodiff.Dual
 
 newtype GADType k a b = GAD {
   evalGAD :: a -> (b, a `k` b)
