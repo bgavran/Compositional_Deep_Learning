@@ -1,4 +1,4 @@
-### Deep learning via Category theory
+### Compositional Deep Learning
 
 This is my attempt to [continue](https://github.com/bgavran/autodiff) formalizing and understanding neural networks in the language of category theory.
 It's a compositional approach to organizing and layering different abstractions found in neural networks:
@@ -6,6 +6,7 @@ It's a compositional approach to organizing and layering different abstractions 
 * Notion of composition of *parametrized* functions
 * Notion of a cost function (fixed or adversarial)
 * Notion of an update rule
+* Notion of meta learning
 
 Most of the work in this repository is inspired by two recent papers:
 
@@ -25,8 +26,10 @@ Progress so far:
 
 
 **TODO**:
-* Implement derivatives of general tensor contraction operations using Einstein notation
+* Find a suitable tensor library with the following features:
+  * Static tensor shapes, known and type-checked at compile time
+  * Some variant of Einstein summation notation for handling of tensors of arbitrary rank
 * Provide working examples of training simple neural networks
 
 
-This is a heavy work in progress, but feel free to send me an email with any questions you might have!
+This is a heavy work in progress, but feel free to drop me an email with any questions you might have!
