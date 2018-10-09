@@ -2,45 +2,48 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: da2bfe190bc131209f7e0ec2879d5329181633b2b7a765b4fdf84dd0dcd897a3
+-- hash: 62c5b14b1e57ec33a34c8024e7f4126e3fb6db5917f12ac293f3b0e9c7f55c3c
 
-name:           CategoricalDeepLearning
+name:           CompositionalDeepLearning
 version:        0.1.0.0
-description:    Please see the README on GitHub at <https://github.com/githubuser/CategoricalDeepLearning#readme>
-homepage:       https://github.com/githubuser/CategoricalDeepLearning#readme
-bug-reports:    https://github.com/githubuser/CategoricalDeepLearning/issues
-author:         Author name here
-maintainer:     example@example.com
-copyright:      2018 Author name here
+description:    Please see the README on GitHub at <https://github.com/githubuser/CompositionalDeepLearning#readme>
+homepage:       https://github.com/githubuser/CompositionalDeepLearning#readme
+bug-reports:    https://github.com/githubuser/CompositionalDeepLearning/issues
+author:         Bruno Gavranović
+maintainer:     bgavran3@gmail.com
+copyright:      2018 Bruno Gavranović
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
 cabal-version:  >= 1.10
 extra-source-files:
-    ChangeLog.md
     README.md
 
 source-repository head
   type: git
-  location: https://github.com/githubuser/CategoricalDeepLearning
+  location: https://github.com/githubuser/CompositionalDeepLearning
 
 library
   exposed-modules:
-                  Additive
-                  CategoricDefinitions
-                  Dual
-                  GAD
-                  Learner
-                  Ops
-                  Para
-                  Train
-                  Test
+      Autodiff.Additive
+      Autodiff.Cont
+      Autodiff.DType
+      Autodiff.Dual
+      Autodiff.GAD
+      CategoricDefinitions
+      Ops
+      Para
+      Train
+      TensorUtils
   other-modules:
-      Paths_CategoricalDeepLearning
+      Paths_CompositionalDeepLearning
   hs-source-dirs:
       src
   build-depends:
-                base >=4.7 && <5
+                base >=4.7 && <5,
+                lens,
+                random,
+                hTensor
   default-language: Haskell2010
   default-extensions:  EmptyCase
                      , FlexibleContexts
@@ -62,29 +65,30 @@ library
                      , UndecidableInstances
                      , GeneralizedNewtypeDeriving
                      , TypeOperators
+                     , TemplateHaskell
   ghc-options: -Wno-partial-type-signatures
 
-executable CategoricalDeepLearning-exe
+executable CompositionalDeepLearning-exe
   main-is: Main.hs
   other-modules:
-      Paths_CategoricalDeepLearning
+      Paths_CompositionalDeepLearning
   hs-source-dirs:
       app
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      CategoricalDeepLearning
+      CompositionalDeepLearning
     , base >=4.7 && <5
   default-language: Haskell2010
 
-test-suite CategoricalDeepLearning-test
+test-suite CompositionalDeepLearning-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
-      Paths_CategoricalDeepLearning
+      Paths_CompositionalDeepLearning
   hs-source-dirs:
       test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      CategoricalDeepLearning
+      CompositionalDeepLearning
     , base >=4.7 && <5
   default-language: Haskell2010
