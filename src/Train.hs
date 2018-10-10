@@ -13,38 +13,10 @@ import Autodiff.Dual
 import Autodiff.Additive
 import Autodiff.DType
 import Ops
+import Para
 import TensorUtils
 
 -------------------------------------------
-
-data ParaType p a b = Para {
-    _param :: p,
-    _fn :: DType (p, a) b
-}
-makeLenses ''ParaType
-
--- Compose two parametrized functions
-(.<<) :: (_)
-    => ParaType q b c
-    -> ParaType p a b
-    -> ParaType (p, q) a c
-(Para q g) .<< (Para p f) = Para (p, q) (g .< f)
-
-fp :: ParaType p a b -> a -> b
-fp (Para p nn) a = f nn (p, a)
-
--- The let b == .. part is here just because tensor shapes aren't known at compile time
--- this is due to using hTensor
-dfp :: OnesLike b => ParaType p a b -> a -> (p, a)
-dfp (Para p nn) a = let b = f nn (p, a)
-                    in df nn (p, a) (onesLike b)
-
-data TrainType p a b c = Train {
-    _para :: ParaType p a b,
-    _cost :: DType b c, -- What constraints does c need to satisfy to measure cost? additive?
-    _optimizer :: (p, p) -> p
-}
-makeLenses ''TrainType
 
 sgd :: Fractional p => (p, p) -> p
 sgd (p, pGrad) = p - 0.1 * pGrad
@@ -54,7 +26,7 @@ extend para cost = para & fn %~ (cost.)
 
 train :: (OnesLike c, _) => TrainType p a b c -> a -> p
 train (Train para cost optimizer) a = let nnWithCost = extend para cost
-                                          (pGrad, _) = dfp nnWithCost a
+                                          (pGrad, _) = dd nnWithCost a
                                       in optimizer (para ^. param, pGrad)
 
 trainStep :: (OnesLike c, _) => TrainType p a b c -> a -> TrainType p a b c

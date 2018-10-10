@@ -1,76 +1,71 @@
 module Para where
 
 import Prelude hiding (id, (.))
+import Control.Lens hiding ((#), para)
 
 import CategoricDefinitions
 import Autodiff.GAD
 import Autodiff.Additive
 import Autodiff.Dual
 import Autodiff.DType
+import TensorUtils
 
-----------------------------------
+-------------------------------------------------------------------
 
-data PType p
-    = P p
-    | (PType p) `X` (PType p)
-    deriving (Eq, Show, Functor)
-
-instance {-# OVERLAPS #-} Additive p => Additive (PType p) where
-    zero = P zero
-    (P p1) ^+ (P p2) = P (p1 ^+ p2)
-    (p1 `X` q1) ^+ (p2 `X` q2) = (p1 ^+ p2) `X` (q1 ^+ q2)
-
-toTuple :: PType p -> (PType p, PType p)
-toTuple (p `X` q) = (p, q)
-toTuple (P p) = error "nope!"
-
-dToTuple :: DType (PType p) (PType p, PType p)
-dToTuple = D $ linearD toTuple (Dual (AddFun (uncurry X))) -- duplicate from Comonad?
-
-extractP :: PType p -> p
-extractP (P p) = p
-
-dFromP :: DType (PType p) p
-dFromP = D $ linearD extractP (Dual (AddFun P))
-
-leftFromP :: Additive2 p a => DType (PType p, a) (p, a)
-leftFromP = dFromP `x` id
-
-{-
-Swap map for mon. product of parametrized functions, from top to bottom
-(a b) (c d)
-a (b, (c, d))
-a ((b, c), d)
-a ((c, b), d)
-a (c, (b, d))
-(a c) (b d)
--}
-
-swapParam :: (Monoidal k, _) => ((a, b), (c, d)) `k` ((a, c), (b, d))
-swapParam = assocR . (id `x` assocL) . (id `x` (swap `x` id)) . (id `x` assocR) . assocL
-
-----------------------------------
-
-
-newtype ParaType p a b = Para {
-    evalPara :: DType (PType p, a) b
+data ParaType p a b = Para {
+    _param :: p,
+    _fn :: DType (p, a) b
 }
+makeLenses ''ParaType
 
-instance Category (ParaType p) where
-    type Allowed (ParaType p) a = Allowed2 DType (PType p) a
+-- Sequential composition of parametrized functions
+(.<<) :: (_)
+    => ParaType q b c
+    -> ParaType p a b
+    -> ParaType (p, q) a c
+(Para q g) .<< (Para p f) = Para (p, q) (g .< f)
 
-    id = Para exr
-    (Para g) . (Para f) = Para $ (g .< f) . (dToTuple `x` id)
+-- Parallel composition of parametrized functions
+(.||) :: (_)
+    => ParaType p a b
+    -> ParaType q c d
+    -> ParaType (p, q) (a, c) (b, d)
+(Para p f) .|| (Para q g) = Para (p, q) (f .| g)
+
+-------------------------------------------------------------------
+
+data TrainType p a b c = Train {
+    _para :: ParaType p a b,
+    _cost :: DType b c, -- What constraints does c need to satisfy to measure cost? additive?
+    _optimizer :: (p, p) -> p
+}
+makeLenses ''TrainType
+
+--How should cost functions be composed in the type below?
+(.<<<) :: (_)
+    => TrainType q b c c2
+    -> TrainType p a b c1
+    -> TrainType (p, q) a c _
+(Train p2 c2 o2) .<<< (Train p1 c1 o1)
+    = Train (p2 .<< p1) undefined (o1 `x` o2 . swapParam)
+
+-- Enriched monoidal product, not sure how to express as a class instance in Haskell
+(.|||) :: (_)
+    => TrainType p a b c1
+    -> TrainType q c d c2
+    -> TrainType (p, q) (a, c) (b, d) (c1, c2)
+(Train p1 c1 o1) .||| (Train p2 c2 o2)
+    = Train (p1 .|| p2) (c1 `x` c2) (o1 `x` o2 . swapParam)
 
 
-instance Monoidal (ParaType p) where
-    (Para f) `x` (Para g) = Para $ (f `x` g) . swapParam . (dToTuple `x` id)
-    assocL = Para $ exr . (id `x` assocL) -- also possible: (unitorL . (counit `x` assocR)), which is better?
-    assocR = Para $ exr . (id `x` assocR)
-    swap = Para $ exr . (id `x` swap)
+-------------------------------------------------------------------
 
-fp :: ParaType p a b -> (PType p, a) -> b
-fp = fGAD . evalDType . evalPara
 
-dfp :: ParaType p a b -> (PType p, a) -> b -> (PType p, a)
-dfp para inp = evalGrad $ (dfGAD . evalDType . evalPara) para inp
+ff :: ParaType p a b -> a -> b
+ff (Para p nn) a = f nn (p, a)
+
+-- The let b == .. part is here just because tensor shapes aren't known at compile time
+-- this is due to using hTensor
+dd :: OnesLike b => ParaType p a b -> a -> (p, a)
+dd (Para p nn) a = let b = f nn (p, a)
+                    in d nn (p, a) (onesLike b)
