@@ -34,28 +34,32 @@ makeLenses ''ParaType
 
 -------------------------------------------------------------------
 
-data TrainType p a b c = Train {
+data LearnerType p a b c = Learner {
     _para :: ParaType p a b,
     _cost :: DType b c, -- What constraints does c need to satisfy to measure cost? additive?
     _optimizer :: (p, p) -> p
 }
-makeLenses ''TrainType
+makeLenses ''LearnerType
 
---How should cost functions be composed in the type below?
+-- Sequential composition of Learners
+-- Paras are composed sequentially,
+-- Cost function is taken to be the last one
+-- Optimizers are composed in parallel
 (.<<<) :: (_)
-    => TrainType q b c c2
-    -> TrainType p a b c1
-    -> TrainType (p, q) a c _
-(Train p2 c2 o2) .<<< (Train p1 c1 o1)
-    = Train (p2 .<< p1) undefined (o1 `x` o2 . swapParam)
+    => LearnerType q b c c2
+    -> LearnerType p a b c1
+    -> LearnerType (p, q) a c c2
+(Learner p2 c2 o2) .<<< (Learner p1 c1 o1)
+    = Learner (p2 .<< p1) c2 (o1 `x` o2 . swapParam)
 
--- Enriched monoidal product, not sure how to express as a class instance in Haskell
+-- Parallel composition of Learners
+-- Everything is composed in parallel
 (.|||) :: (_)
-    => TrainType p a b c1
-    -> TrainType q c d c2
-    -> TrainType (p, q) (a, c) (b, d) (c1, c2)
-(Train p1 c1 o1) .||| (Train p2 c2 o2)
-    = Train (p1 .|| p2) (c1 `x` c2) (o1 `x` o2 . swapParam)
+    => LearnerType p a b c1
+    -> LearnerType q c d c2
+    -> LearnerType (p, q) (a, c) (b, d) (c1, c2)
+(Learner p1 c1 o1) .||| (Learner p2 c2 o2)
+    = Learner (p1 .|| p2) (c1 `x` c2) (o1 `x` o2 . swapParam)
 
 
 -------------------------------------------------------------------
