@@ -9,13 +9,13 @@ ds # cs = listArray ds cs :: Array Double
 class ArrShow a where
     arrShow :: a -> String
 
-instance (Show a, Num a) => ArrShow a where
+instance {-# OVERLAPPABLE #-} Show a => ArrShow a where
     arrShow = show
 
-instance ArrShow (NArray None Double) where
+instance {-# OVERLAPPING #-} ArrShow (NArray None Double) where
     arrShow = formatFixed 2
 
-instance (ArrShow a, ArrShow b) => ArrShow (a, b) where
+instance {-# OVERLAPPING #-} (ArrShow a, ArrShow b) => ArrShow (a, b) where
     arrShow (a, b) = let ls = replicate 10 '-' ++ "\n"
                      in ls ++ arrShow a ++ ", \n" ++ arrShow b ++ "\n" ++ ls
 
@@ -38,10 +38,10 @@ randArray xs cs = do
 class OnesLike a where
     onesLike :: a -> a
 
-instance {-# OVERLAPS #-} Num a => OnesLike a where
+instance {-# OVERLAPPING #-} Num a => OnesLike a where
     onesLike _ = 1
 
-instance {-# OVERLAPS #-} OnesLike (NArray None Double) where
+instance {-# OVERLAPPING #-} OnesLike (NArray None Double) where
     -- Assumes single-letter index names
     onesLike c = let d  = map iDim $ dims c
                      ch = concatMap iName $ dims c

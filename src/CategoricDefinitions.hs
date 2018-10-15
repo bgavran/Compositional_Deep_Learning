@@ -110,6 +110,19 @@ instance Floating a => FloatCat (->) a where
 instance Fractional a => FractCat (->) a where
     recipC = recip
 
+instance (Num a, Num b) => Num (a,b) where
+    fromInteger x = (fromInteger x, fromInteger x)
+    (a,b) + (a',b') = (a + a', b + b')
+    (a,b) - (a',b') = (a - a', b - b')
+    (a,b) * (a',b') = (a * a', b * b')
+    negate (a,b) = (negate a, negate b)
+    abs (a,b) = (abs a, abs b)
+    signum (a,b) = (signum a, signum b)
+
+instance (Num (a, b), Fractional a, Fractional b) => Fractional (a, b) where
+    recip (a, b) = (recip a, recip b)
+    fromRational r = (fromRational r, fromRational r)
+
 -------------------------------------
 
 instance {-# OVERLAPS #-} (Num a) => Additive a where

@@ -59,7 +59,6 @@ a ((c, b), d)
 a (c, (b, d))
 (a c) (b d)
 -}
-
 swapParam :: (Monoidal k, _) => ((a, b), (c, d)) `k` ((a, c), (b, d))
 swapParam = assocR . (id `x` assocL) . (id `x` (swap `x` id)) . (id `x` assocR) . assocL
 

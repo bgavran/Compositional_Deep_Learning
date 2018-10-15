@@ -31,10 +31,13 @@ library
       Autodiff.Dual
       Autodiff.GAD
       CategoricDefinitions
+      --Bicategory
       Ops
       Para
-      Train
+      TrainUtils
       TensorUtils
+      --EasyTensorUtils
+      Examples
   other-modules:
       Paths_CompositionalDeepLearning
   hs-source-dirs:
@@ -66,6 +69,10 @@ library
                      , GeneralizedNewtypeDeriving
                      , TypeOperators
                      , TemplateHaskell
+                     , AllowAmbiguousTypes
+                     , TypeApplications
+                     , DataKinds
+                     , OverloadedLists
   ghc-options: -Wno-partial-type-signatures
 
 executable CompositionalDeepLearning-exe

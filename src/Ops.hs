@@ -14,6 +14,12 @@ relu :: DType Double Double
 relu = D $ GAD $ \a -> let b = if a < 0 then 0 else 1
                        in (b*a, Dual $ AddFun (*b))
 
+sgd :: Fractional p => (p, p) -> p
+sgd (p, pGrad) = p - 0.1 * pGrad
+
+sqDiff :: DType (Double, Double) Double
+sqDiff = mulC . dup . (id \/ negateC)
+
 
 {-
    e^a + a * b

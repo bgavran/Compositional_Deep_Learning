@@ -1,5 +1,6 @@
 module Main where
 
+import Prelude hiding (id, (.))
 import Numeric.LinearAlgebra.Array
 import Numeric.LinearAlgebra.Array.Util
 import System.Random
