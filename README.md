@@ -17,6 +17,10 @@ They're talking about similar things in the language of category theory, albeit 
 
 ----
 
+A tiny example of simple linear regression can be found in Examples.hs
+
+----
+
 Progress so far:
 * Main parts of SimpleAD paper are fully implemented
   * Generalized, mode-independent automatic differentiation with rudimentary functions
@@ -30,6 +34,7 @@ Progress so far:
   * Static tensor shapes, known and type-checked at compile time
   * Some variant of Einstein summation notation for handling of tensors of arbitrary rank
 * Provide working examples of training simple neural networks
+* Find a way to graphically show how **GAD**, **Para** and **Learners** compose
 
 
 This is a heavy work in progress, but feel free to drop me an email with any questions you might have!
