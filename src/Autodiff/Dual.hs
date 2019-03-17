@@ -2,12 +2,13 @@ module Autodiff.Dual where
 
 import Prelude hiding (id, (.), curry, uncurry)
 import Control.Lens hiding ((#), para)
+import Data.Kind (Type)
 
 import qualified Prelude as P
 
 import CategoricDefinitions
 
-newtype DualType k a b = Dual {
+newtype DualType (k :: Type -> Type -> Type) a b = Dual {
     _evalDual :: b `k` a
 }
 makeLenses ''DualType
@@ -22,10 +23,6 @@ instance Monoidal k => Monoidal (DualType k) where
     Dual f `x` Dual g = Dual (f `x` g)
     assocL = Dual assocR
     assocR = Dual assocL
-    --unitorL = Dual unitorL'
-    --unitorL' = Dual unitorL
-    --unitorR = Dual unitorR'
-    --unitorR' = Dual unitorR
     swap = Dual swap
 
 instance (Cartesian k, Cocartesian k) => Cartesian (DualType k) where
