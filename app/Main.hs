@@ -8,7 +8,9 @@ import Control.Monad
 import Control.Lens hiding ((#), para)
 
 import CategoricDefinitions
-import Autodiff.DType
+import Autodiff.D
+import Para
+import Examples
 
 main :: IO ()
-main = print "Hello, world!"
+main = run

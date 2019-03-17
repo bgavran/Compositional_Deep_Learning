@@ -5,20 +5,25 @@ import Prelude hiding (id, (.))
 import System.Random
 import Control.Monad
 
+import Numeric.LinearAlgebra.Array
+import Numeric.LinearAlgebra.Array.Util
+
 import CategoricDefinitions
 import Autodiff.GAD
-import Autodiff.DType
+import Autodiff.D
 import Ops
 import Para
 import TrainUtils
+import TensorUtils
+import OnesLike
 
 {-
-f (p, q) (a, b) = (p + q*a, b)
+f (p, q) a = (p + q*a)
 -}
-linReg :: _ => ParaType (a, a) (a, a) (a, a)
-linReg = Para $ (addC `x` id) . assocR . (id `x` (mulC `x` id)) . (id `x` assocR) . assocL
+linRegFn :: (Additive a, Num a) => DType ((a, a), a) a
+linRegFn = addC . (id `x` mulC) . assocL
 
--- returns (inp, out) pair
+-- returns (inp, out) pair we want to learn
 sampleData :: IO (Double, Double)
 sampleData = do
     x <- randomIO :: IO Double
@@ -26,23 +31,36 @@ sampleData = do
 
 run :: IO ()
 run = do
-    p1 <- randomIO :: IO Double
-    p2 <- randomIO :: IO Double
-    let nn = Learner {
-            _p = (p1, p2),
-            _para = linReg,
-            _cost = sqDiff,
-            _optimizer = sgd}
-        sampler = zip [0..] (repeat sampleData)
+    initialParams <- randomIO :: IO (Double, Double)
+    let initialLearner = Learner initialParams (Para linRegFn) sgd
+        sampler = zip3 [0..] (repeat sampleData) (repeat sqDiff)
 
-    finalNet <- foldM trainStep nn (take 10000 sampler)
-    putStrLn $ "Starting network parameters: " ++ show (p1, p2)
-    putStrLn $ "Final network parameters: " ++ show (finalNet ^. p)
+    finalLearner <- foldM trainStepWithCost initialLearner (take 10000 sampler)
+    putStrLn $ "Starting network parameters:\n" ++ show initialParams
+    putStrLn $ "Final network parameters:\n" ++ show (finalLearner ^. p)
 
     return ()
 
 
+sampleDataTensor :: IO (Tensor, Tensor)
+sampleDataTensor = do
+    d <- randomTensor [5, 3] "bf"
+    return (d, 3 + 7 * d)
 
---sampleDataTensor :: IO (NArray None Double)
---sampleDataTensor = randArray [3, 5] "jk"
---    p1 <- randArray [2, 3] "ij"
+-- multiply two arrays you get and sum the "b" axis
+l :: _ => ParaType (Tensor, Tensor) Tensor Tensor
+l = Para $ sumAxes "b" . linRegFn
+
+run1 :: IO _
+run1 = do
+    p1 <- randomTensor [3, 2] "fo"
+    p2 <- randomTensor [2] "o"
+    let initialLearner = Learner (p1, p2) l sgd
+        sampler = zip3 [0..] (repeat sampleDataTensor) (repeat (sumAxes "b" . sqDiff))
+
+
+    finalLearner <- foldM trainStepWithCost initialLearner (take 1 sampler)
+    putStrLn $ "Starting network parameters:\n" ++ arrShow (p1, p2)
+    putStrLn $ "Final network parameters:\n" ++ arrShow (finalLearner ^. p)
+
+    return finalLearner

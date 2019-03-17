@@ -1,13 +1,19 @@
 module Autodiff.Additive where
 
 import Prelude hiding (id, (.))
+import Control.Lens hiding ((#), para)
 import qualified Prelude as P
 
 import CategoricDefinitions
+import OnesLike
 
+{-
+The sole purpose of this is to wrap around (->) and provide a Cocartesian instance (which (->) doesn't have)
+-}
 newtype a ->+ b = AddFun {
-  evalAF :: a -> b
+    _evalAF :: a -> b
 }
+makeLenses ''(->+)
 
 instance Category (->+) where
     type Allowed (->+) a = Additive a
@@ -61,7 +67,7 @@ unitF :: Additive a => () -> a
 inlF = \a -> (a, zero)
 inrF = \b -> (zero, b)
 jamF = \(a, b) -> a ^+ b
-unitF = \_ -> zero
+unitF = \_ -> zero -- this should probably be onesLike?
 
 type Additive2 a b = (Additive a, Additive b)
 type Additive3 a b c = (Additive2 a b, Additive c)

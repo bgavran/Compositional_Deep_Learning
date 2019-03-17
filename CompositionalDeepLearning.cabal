@@ -27,16 +27,14 @@ library
   exposed-modules:
       Autodiff.Additive
       Autodiff.Cont
-      Autodiff.DType
+      Autodiff.D
       Autodiff.Dual
       Autodiff.GAD
       CategoricDefinitions
-      --Bicategory
       Ops
       Para
       TrainUtils
       TensorUtils
-      --EasyTensorUtils
       Examples
   other-modules:
       Paths_CompositionalDeepLearning
@@ -46,7 +44,9 @@ library
                 base >=4.7 && <5,
                 lens,
                 random,
-                hTensor
+                hTensor,
+                text,
+                NumInstances
   default-language: Haskell2010
   default-extensions:  EmptyCase
                      , FlexibleContexts

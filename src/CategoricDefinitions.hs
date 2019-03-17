@@ -3,17 +3,22 @@ module CategoricDefinitions where
 import Prelude hiding (id, (.))
 import qualified Prelude as P
 import GHC.Exts (Constraint)
+import Data.Kind (Type)
+import Data.NumInstances.Tuple
 
+import Numeric.LinearAlgebra.Array
+import Numeric.LinearAlgebra.Array.Util
 
-class Category (k :: * -> * -> *) where
+-- Standard haskell way to define a category
+class Category (k :: Type -> Type -> Type) where
     type Allowed k a :: Constraint
     type Allowed k a = ()
 
     id  :: Allowed k a => a `k` a
-    (.) :: Allowed3 k a b c => (b `k` c) -> (a `k` b) -> (a `k` c)
+    (.) :: Allowed3 k a b c => b `k` c -> a `k` b -> a `k` c
 
 -- By monoidal here we mean symmetric monoidal category
-class Category k => Monoidal (k :: * -> * -> *) where
+class Category k => Monoidal (k :: Type -> Type -> Type) where
     -- unit object in haskell is ()
     x :: Allowed6 k a b c d (a, b) (c, d)
       => (a `k` c) -> (b `k` d) -> ((a, b) `k` (c, d))
@@ -21,18 +26,8 @@ class Category k => Monoidal (k :: * -> * -> *) where
            => ((a, b), c) `k` (a, (b, c))
     assocR :: Allowed7 k a b c (a, b) ((a, b), c) (b, c) (a, (b, c))
            => (a, (b, c)) `k` ((a, b), c)
-    --unitorL :: Allowed k a
-    --        => ((), a) `k` a
-    --unitorL' :: Allowed k a -- inverse of unitorL
-    --         => a `k` ((), a)
-    --unitorR :: Allowed k a
-    --        => (a, ()) `k` a
-    --unitorR' :: Allowed k a -- inverse of unitorR
-    --         => a `k` (a, ())
     swap :: Allowed4 k a b (a, b) (b, a)
          => (a, b) `k` (b, a)
-
-
 
 class Monoidal k => Cartesian k where
     type AllowedCar k a :: Constraint
@@ -52,6 +47,45 @@ class Category k => Cocartesian k where
     jam :: AllowedCoCar k a => (a, a) `k` a
     unit :: AllowedCoCar k a => () `k` a
 
+{-
+This is a hacky way of modelling a weak 2-category which is needed for Para.
+Notice the tick' after class name
+(.*) corresponds to id
+(.-) corresponds to . (sequential comp)
+(.|) corresponds to `x` (parallel comp)
+-}
+
+class Category' (k :: Type -> Type -> Type -> Type) where
+    type Allowed' k a :: Constraint
+    type Allowed' k a = ()
+
+    (.*) :: (Allowed' k a) => k () a a
+    (.-) :: (Allowed' k p, Allowed' k q,
+             Allowed' k a, Allowed' k b, Allowed' k c)
+          => k q b c -> k p a b -> k (p, q) a c
+
+class Category' k => Monoidal' (k :: Type -> Type -> Type -> Type) where
+    (.|) :: (Allowed' k a,
+             Allowed' k b,
+             Allowed' k c,
+             Allowed' k d,
+             Allowed' k p,
+             Allowed' k q)
+      => k p a c -> k q b d -> k (p, q) (a, b) (c, d)
+
+{-
+Swap map for monoidal product of parametrized functions, basically bracket bookkeeping.
+Read from top to bottom
+(a b) (c d)
+a (b, (c, d))
+a ((b, c), d)
+a ((c, b), d)
+a (c, (b, d))
+(a c) (b d)
+-}
+swapParam :: (Monoidal k, _) => ((a, b), (c, d)) `k` ((a, c), (b, d))
+swapParam = assocR . (id `x` assocL) . (id `x` (swap `x` id)) . (id `x` assocR) . assocL
+
 
 --------------------------------------
 
@@ -59,20 +93,22 @@ class Additive a where
     zero :: a
     (^+) :: a -> a -> a
 
-class NumCat k a where
+class NumCat (k :: Type -> Type -> Type) a where
     negateC :: a `k` a
     addC :: (a, a) `k` a
     mulC :: (a, a) `k` a
     increaseC :: a -> a `k` a -- curried add, add a single number
 
-class FloatCat k a where
+class FloatCat (k :: Type -> Type -> Type) a where
     expC :: a `k` a
 
-class FractCat k a where
+class FractCat (k :: Type -> Type -> Type) a where
     recipC :: a `k` a
 
-class Scalable k a where
+class Scalable (k :: Type -> Type -> Type) a where
     scale :: a -> (a `k` a)
+
+type Tensor = NArray None Double
 
 -------------------------------------
 -- Instances
@@ -86,10 +122,6 @@ instance Monoidal (->) where
     f `x` g = \(a, b) -> (f a, g b)
     assocL = \((a, b), c) -> (a, (b, c))
     assocR = \(a, (b, c)) -> ((a, b), c)
-    --unitorL = \((), a) -> a
-    --unitorL' = \a -> ((), a)
-    --unitorR = \(a, ()) -> a
-    --unitorR' = \a -> (a, ())
     swap = \(a, b) -> (b, a)
 
 instance Cartesian (->) where
@@ -110,26 +142,17 @@ instance Floating a => FloatCat (->) a where
 instance Fractional a => FractCat (->) a where
     recipC = recip
 
-instance (Num a, Num b) => Num (a,b) where
-    fromInteger x = (fromInteger x, fromInteger x)
-    (a,b) + (a',b') = (a + a', b + b')
-    (a,b) - (a',b') = (a - a', b - b')
-    (a,b) * (a',b') = (a * a', b * b')
-    negate (a,b) = (negate a, negate b)
-    abs (a,b) = (abs a, abs b)
-    signum (a,b) = (signum a, signum b)
-
-instance (Num (a, b), Fractional a, Fractional b) => Fractional (a, b) where
-    recip (a, b) = (recip a, recip b)
-    fromRational r = (fromRational r, fromRational r)
-
 -------------------------------------
 
-instance {-# OVERLAPS #-} (Num a) => Additive a where
+instance Additive () where
+    zero = ()
+    () ^+ () = ()
+
+instance {-# OVERLAPPABLE #-} Num a => Additive a where
     zero = 0
     (^+) = (+)
 
-instance {-# OVERLAPS #-} (Additive a, Additive b) => Additive (a, b) where
+instance (Additive a, Additive b) => Additive (a, b) where
     zero = (zero, zero)
     (a1, b1) ^+ (a2, b2) = (a1 ^+ a2, b1 ^+ b2)
 
@@ -154,6 +177,8 @@ join (f, g) = f \/ g
 unjoin :: (Cocartesian k, _) => (a, b) `k` c -> (a `k` c, b `k` c)
 unjoin h = (h . inl, h . inr)
 
+divide :: (Monoidal k, FractCat k a, _) => k (a, a) a
+divide = mulC . (id `x` recipC)
 -------------------------------------
 
 type Allowed2 k a b = (Allowed k a, Allowed k b)
