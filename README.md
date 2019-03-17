@@ -1,19 +1,27 @@
 ### Compositional Deep Learning
 
-This is my attempt to [continue](https://github.com/bgavran/autodiff) formalizing and understanding neural networks in the language of category theory.
+This is a long-term project of understanding and reimplementing neural networks from first principles using the language of category theory.
 It's a compositional approach to organizing and layering different abstractions found in neural networks:
 * Differentiation of composition of functions (forward mode, reverse mode)
 * Notion of composition of *parametrized* functions
 * Notion of a cost function (fixed or adversarial)
 * Notion of an update rule
 * Notion of meta learning
+* Notion of multi-agent neural networks 
 
-Most of the work in this repository is inspired by two recent papers:
+As more and more components of our deep learning systems stop being fixed throughout training, there is an increasingly larger need for more precise formal specification of the things that _do_ stay fixed.
+Standard methods don't seem to be as effective: the invariants across all these
+networks seem to be rather abstract and hard to describe. This repository explores the speculation that the language of category theory could be well suited to describe and quantify these structures.
 
-* [The simple essence of automatic differentiation](http://conal.net/papers/essence-of-ad/)
+Focus is currently not on reimplementation of popular new network architectures, but rather on principled, structured design of both neural networks and the way they are trained.
+
+This is research level stuff and at the moment not really usable for anything other than playing around.
+
+Related work:
+
+* [The simple essence of automatic differentiation (SimpleAD)](http://conal.net/papers/essence-of-ad/)
 * [Backprop as Functor](https://arxiv.org/abs/1711.10455)
-
-They're talking about similar things in the language of category theory, albeit in a slightly different way. My goal is to reconcile their work and expand on it.
+* [Lenses and Learners](https://arxiv.org/abs/1903.03671)
 
 ----
 
@@ -25,8 +33,7 @@ Progress so far:
 * Main parts of SimpleAD paper are fully implemented
   * Generalized, mode-independent automatic differentiation with rudimentary functions
   * Backpropagation (which is *just a specialization of GAD to the dual category of additive functions*)
-* Implemented category **Para** from BackpropFunctor
-* **Novel**: Implemented **Para** in terms of **GAD**, making _request_ function from BackpropFunctor obsolete
+* Implemented category **Para** from BackpropFunctor (in a slightly different way than in the paper, such that the _request function_ in the specified form isn't really needed)
 
 
 **TODO**:
@@ -34,7 +41,8 @@ Progress so far:
   * Static tensor shapes, known and type-checked at compile time
   * Some variant of Einstein summation notation for handling of tensors of arbitrary rank
 * Provide working examples of training simple neural networks
-* Find a way to graphically show how **GAD**, **Para** and **Learners** compose
+* Find a way to graphically show composition of **GAD**, **Para** and **Learners**
+* Explore using effects for data loading
 
 
-This is a heavy work in progress, but feel free to drop me an email with any questions you might have!
+This is a heavy work in progress, but feel free to drop me a message with any questions!
