@@ -2,6 +2,7 @@ module Autodiff.D where
 
 import Prelude hiding (id, (.))
 import Control.Lens hiding ((#), para)
+import Control.Arrow
 
 import CategoricDefinitions
 import Autodiff.GAD
@@ -47,11 +48,11 @@ instance Fractional s => FractCat DType s where
 ---------------------------
 
 grad' :: DType a b -> a -> b -> a
-grad' para a = (para ^. evalDType.evalGAD) a ^. (_2.evalDual.evalAF)
+grad' d a = (d ^. evalDType.evalGAD) a ^. (_2.evalDual.evalAF)
 
 -- just normal output of DType
 f :: DType a b -> a -> b
-f dt a = (dt ^. evalDType.evalGAD) a ^. _1
+f d a = (d ^. evalDType.evalGAD) a ^. _1
 
 -- grad is grad' with ones as the incoming derivative
 grad :: _ => DType a b -> a -> a
@@ -72,8 +73,7 @@ g .-- f = g . (id `x` f) . assocL . (swap `x` id)
 f .|| g = f `x` g . swapParam
 
 partiallyApply :: (Additive3 a b c) => DType (a, b) c -> a -> DType b c
-partiallyApply dt a = D $ GAD $ \b -> let (c, dt') = (dt ^. evalDType.evalGAD) (a, b)
-                                      in (c, dt' . inr)
+partiallyApply dt a = D $ GAD $ \b -> second (.inr) $ (dt ^. evalDType.evalGAD) (a, b)
 
 
 ---------------------------

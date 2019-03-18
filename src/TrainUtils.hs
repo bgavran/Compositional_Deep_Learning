@@ -19,11 +19,6 @@ import TensorUtils
 import OnesLike
 
 -------------------------------------------
-
-calcNewParam :: (OnesLike c, _) => DType b c -> LearnerType p a b -> a -> p
-calcNewParam cost l a = let (pGrad, _) = grad (cost . (l ^. para . fn)) (l ^. p, a)
-                        in (l ^. optimizer) (l ^. p, pGrad)
-
 showNNInfo :: (ArrShow p, ArrShow a, ArrShow b)
     => Int -> a -> b -> LearnerType p a b -> IO ()
 showNNInfo n a b nn = do
@@ -39,10 +34,12 @@ showNNInfo n a b nn = do
 -- it partially applies the output to the cost function and composes the result inside learner
 trainStepWithCost :: (OnesLike c, _)
     => LearnerType p a b -> (Int, IO (a, b), DType (b, b) c) -> IO (LearnerType p a b)
-trainStepWithCost nn (step, dataSampler, cost) = do
+trainStepWithCost l (step, dataSampler, cost) = do
     (i, o) <- dataSampler
-    when (step `mod` 100 == 0) $ showNNInfo step i o nn
-    return $ nn & p .~ calcNewParam (partiallyApply cost o) nn i
+    when (step `mod` 100 == 0) $ showNNInfo step i o l
+    let cost' = partiallyApply cost o
+        (pGrad, _) = grad (cost' . (l ^. para . fn)) (l ^. p, i)
+    return $ l & p .~ (l ^. optimizer) (l ^. p, pGrad)
 
 
 instance (Random a, Random b) => Random (a, b) where
