@@ -1,9 +1,8 @@
-{-# LANGUAGE GADTs #-}
 module CategoricDefinitions where
 
 import Prelude hiding (id, (.))
 import qualified Prelude as P
-import GHC.Exts (Constraint)
+import GHC.Exts
 import Data.Kind (Type)
 import Data.NumInstances.Tuple
 
@@ -19,7 +18,7 @@ class Category (k :: Type -> Type -> Type) where
     (.) :: Allowed3 k a b c => b `k` c -> a `k` b -> a `k` c
 
 -- By monoidal here we mean symmetric monoidal category
-class (forall a b. (Allowed k a, Allowed k b) => Allowed k (a, b), Category k) => Monoidal (k :: Type -> Type -> Type) where
+class Category k => Monoidal (k :: Type -> Type -> Type) where
     -- unit object in haskell is ()
     x :: Allowed6 k a b c d (a, b) (c, d)
       => (a `k` c) -> (b `k` d) -> ((a, b) `k` (c, d))
@@ -62,12 +61,6 @@ Notice the tick' after class name
 
 Ideally, we'd like to specify in code that given any symmetric monoidal category C we can construct _another_ symmetric monoidal category called Para(C), but sometimes dreams will have to be dreams.
 -}
-
---data Para' (k : Type -> Type -> Type) a b where
---    idd :
---
---ww :: Monoidal k => Para' k a b
---ww = undefined
 
 class Category' (k :: Type -> Type -> Type -> Type) where
     type Allowed' k a :: Constraint

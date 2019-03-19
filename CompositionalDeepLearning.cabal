@@ -37,6 +37,7 @@ library
       TensorUtils
       Examples
       AsymmetricLens
+      Test
   other-modules:
       Paths_CompositionalDeepLearning
   hs-source-dirs:
