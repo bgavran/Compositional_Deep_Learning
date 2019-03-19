@@ -58,20 +58,6 @@ f d a = (d ^. evalDType.evalGAD) a ^. _1
 grad :: _ => DType a b -> a -> a
 grad dt' t  = grad' (counit . dt') t ()
 
--- Sequential composition of parametrized functions
-(.--) :: (Monoidal k, _)
-    => (q, b) `k` c
-    -> (p, a) `k` b
-    -> ((p, q), a) `k` c
-g .-- f = g . (id `x` f) . assocL . (swap `x` id)
-
--- Parallel composition of parametrized functions
-(.||) :: (Monoidal k, _)
-    => (p, a) `k` b
-    -> (q, c) `k` d
-    -> ((p, q), (a, c)) `k` (b, d)
-f .|| g = f `x` g . swapParam
-
 partiallyApply :: (Additive3 a b c) => DType (a, b) c -> a -> DType b c
 partiallyApply dt a = D $ GAD $ \b -> second (.inr) $ (dt ^. evalDType.evalGAD) (a, b)
 

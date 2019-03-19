@@ -32,6 +32,8 @@ instance Monoidal k => Monoidal (GADType k) where
                                        in ((c, d), f' `x` g')
     assocL = linearD assocL assocL
     assocR = linearD assocR assocR
+    unitorL = linearD unitorL unitorL
+    unitorL' = linearD unitorL' unitorL'
     swap = linearD swap swap
 
 instance Cartesian k => Cartesian (GADType k) where

@@ -23,6 +23,8 @@ instance Monoidal k => Monoidal (DualType k) where
     Dual f `x` Dual g = Dual (f `x` g)
     assocL = Dual assocR
     assocR = Dual assocL
+    unitorL = Dual unitorL'
+    unitorL' = Dual unitorL
     swap = Dual swap
 
 instance (Cartesian k, Cocartesian k) => Cartesian (DualType k) where

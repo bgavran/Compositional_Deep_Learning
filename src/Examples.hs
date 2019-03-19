@@ -48,7 +48,7 @@ sampleDataTensor = do
     return (d, 3 + 7 * d)
 
 -- multiply two arrays you get and sum the "b" axis
-l :: _ => ParaType (Tensor, Tensor) Tensor Tensor
+l :: _ => ParaDType (Tensor, Tensor) Tensor Tensor
 l = Para $ sumAxes "b" . linRegFn
 
 run1 :: IO _

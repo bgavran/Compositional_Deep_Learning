@@ -24,6 +24,8 @@ instance Monoidal (->+) where
     AddFun f `x` AddFun g = AddFun (f `x` g)
     assocL = AddFun assocL
     assocR = AddFun assocR
+    unitorL = AddFun unitorL
+    unitorL' = AddFun unitorL'
     swap = AddFun swap
 
 instance Cartesian (->+) where

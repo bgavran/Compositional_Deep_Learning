@@ -36,6 +36,7 @@ library
       TrainUtils
       TensorUtils
       Examples
+      AsymmetricLens
   other-modules:
       Paths_CompositionalDeepLearning
   hs-source-dirs:
@@ -73,6 +74,7 @@ library
                      , TypeApplications
                      , DataKinds
                      , OverloadedLists
+                     , QuantifiedConstraints
   ghc-options: -Wno-partial-type-signatures
 
 executable CompositionalDeepLearning-exe

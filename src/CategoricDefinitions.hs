@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs #-}
 module CategoricDefinitions where
 
 import Prelude hiding (id, (.))
@@ -18,7 +19,7 @@ class Category (k :: Type -> Type -> Type) where
     (.) :: Allowed3 k a b c => b `k` c -> a `k` b -> a `k` c
 
 -- By monoidal here we mean symmetric monoidal category
-class Category k => Monoidal (k :: Type -> Type -> Type) where
+class (forall a b. (Allowed k a, Allowed k b) => Allowed k (a, b), Category k) => Monoidal (k :: Type -> Type -> Type) where
     -- unit object in haskell is ()
     x :: Allowed6 k a b c d (a, b) (c, d)
       => (a `k` c) -> (b `k` d) -> ((a, b) `k` (c, d))
@@ -26,6 +27,11 @@ class Category k => Monoidal (k :: Type -> Type -> Type) where
            => ((a, b), c) `k` (a, (b, c))
     assocR :: Allowed7 k a b c (a, b) ((a, b), c) (b, c) (a, (b, c))
            => (a, (b, c)) `k` ((a, b), c)
+    unitorL :: Allowed k a
+            => ((), a) `k` a
+    unitorL' :: Allowed k a -- inverse of unitorL
+            => a `k` ((), a)
+    -- could also potentially add right unitor and their inverses
     swap :: Allowed4 k a b (a, b) (b, a)
          => (a, b) `k` (b, a)
 
@@ -53,25 +59,43 @@ Notice the tick' after class name
 (.*) corresponds to id
 (.-) corresponds to . (sequential comp)
 (.|) corresponds to `x` (parallel comp)
+
+Ideally, we'd like to specify in code that given any symmetric monoidal category C we can construct _another_ symmetric monoidal category called Para(C), but sometimes dreams will have to be dreams.
 -}
+
+--data Para' (k : Type -> Type -> Type) a b where
+--    idd :
+--
+--ww :: Monoidal k => Para' k a b
+--ww = undefined
 
 class Category' (k :: Type -> Type -> Type -> Type) where
     type Allowed' k a :: Constraint
     type Allowed' k a = ()
 
     (.*) :: (Allowed' k a) => k () a a
-    (.-) :: (Allowed' k p, Allowed' k q,
-             Allowed' k a, Allowed' k b, Allowed' k c)
+    (.-) :: (Allowed' k p, Allowed' k q, Allowed' k a, Allowed' k b, Allowed' k c, Allowed' k ((p, q), a), Allowed' k ((q, p), a), Allowed' k c, Allowed' k (q, (p, a)), Allowed' k (q, b), Allowed' k q, Allowed' k (p, a), Allowed' k b, Allowed' k p, Allowed' k a, Allowed' k (q, p), Allowed' k (p, q))
           => k q b c -> k p a b -> k (p, q) a c
 
+-- the constraints are unfortunately very ugly
 class Category' k => Monoidal' (k :: Type -> Type -> Type -> Type) where
-    (.|) :: (Allowed' k a,
-             Allowed' k b,
-             Allowed' k c,
-             Allowed' k d,
-             Allowed' k p,
-             Allowed' k q)
+    (.|) :: (Allowed' k a, Allowed' k b, Allowed' k c, Allowed' k d, Allowed' k p, Allowed' k q, Allowed' k ((p, q), (a, b)), Allowed' k ((p, a), (q, b)), Allowed' k (c, d), Allowed' k (p, a), Allowed' k (q, b), Allowed' k (p, (q, (a, b))), Allowed' k (p, ((q, a), b)), Allowed' k (p, ((a, q), b)), Allowed' k (p, (a, (q, b))), Allowed' k (a, (q, b)), Allowed' k ((a, q), b), Allowed' k (a, q), Allowed' k ((q, a), b), Allowed' k (q, a), Allowed' k (q, (a, b)), Allowed' k (a, b), Allowed' k (p, q))
       => k p a c -> k q b d -> k (p, q) (a, b) (c, d)
+
+-- Sequential composition of parametrized functions
+(.--) :: (Monoidal k, _)
+    => (q, b) `k` c
+    -> (p, a) `k` b
+    -> ((p, q), a) `k` c
+g .-- f = g . (id `x` f) . assocL . (swap `x` id)
+
+-- Parallel composition of parametrized functions
+(.||) :: (Monoidal k, _)
+    => (p, a) `k` b
+    -> (q, c) `k` d
+    -> ((p, q), (a, c)) `k` (b, d)
+f .|| g = f `x` g . swapParam
+
 
 {-
 Swap map for monoidal product of parametrized functions, basically bracket bookkeeping.
@@ -122,6 +146,8 @@ instance Monoidal (->) where
     f `x` g = \(a, b) -> (f a, g b)
     assocL = \((a, b), c) -> (a, (b, c))
     assocR = \(a, (b, c)) -> ((a, b), c)
+    unitorL = \((), a) -> a
+    unitorL' = \a -> ((), a)
     swap = \(a, b) -> (b, a)
 
 instance Cartesian (->) where

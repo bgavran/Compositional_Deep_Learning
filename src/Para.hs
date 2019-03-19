@@ -12,34 +12,38 @@ import Autodiff.Dual
 import Autodiff.D
 import TensorUtils
 import OnesLike
+import AsymmetricLens
 
 -------------------------------------------------------------------
 
-newtype ParaType p a b = Para {
-    _fn :: DType (p, a) b
+newtype ParaType (k :: Type -> Type -> Type) p a b = Para {
+    _fn :: (p, a) `k` b
 }
 makeLenses ''ParaType
 
-instance Category' ParaType where
-    type Allowed' ParaType a = (Allowed DType a, OnesLike a)
+instance Monoidal k => Category' (ParaType k) where
+    type Allowed' (ParaType k) a = (Allowed k a)
+    (.*) = Para unitorL
+    (Para g)  .-  (Para f) = Para (g .-- f)
 
-    (.*) = Para exr
-    (Para g) .- (Para f) = Para (g .-- f)
-
-instance Monoidal' ParaType where
+instance Monoidal k => Monoidal' (ParaType k) where
     (Para f) .| (Para g) = Para (f .|| g)
 
 -------------------------------------------------------------------
 
+type ParaDType = ParaType DType
+
+type ParaLType = ParaType (AsymmetricLens DType)
+
 data LearnerType p a b = Learner {
     _p :: p,
-    _para :: ParaType p a b,
+    _para :: ParaDType p a b,
     _optimizer :: (p, p) -> p
 }
 makeLenses ''LearnerType
 
 instance Category' LearnerType where
-    type Allowed' LearnerType a = Allowed' ParaType a
+    type Allowed' LearnerType a = Allowed' ParaDType a
 
     (.*) = Learner () (.*) snd
     (Learner p2 f2 o2) .- (Learner p1 f1 o1) =
