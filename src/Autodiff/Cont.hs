@@ -4,9 +4,10 @@ import Prelude hiding (id, (.))
 
 import CategoricDefinitions
 
+-- TODO OUTDATED; I need to update this!
 newtype ContType k r a b = Cont ( (b `k` r) -> (a `k` r)) -- a -> b -> r
 
-cont :: (Category k, Allowed3 k a b r) => (a `k` b) -> ContType k r a b
+cont :: (Category k, AllAllowed k [a, b, r]) => (a `k` b) -> ContType k r a b
 cont f = Cont (. f)
 
 instance Category k => Category (ContType k r) where
@@ -14,7 +15,6 @@ instance Category k => Category (ContType k r) where
   id = Cont id
   Cont g . Cont f = Cont (f . g)
 
--- OUTDATED; I need to update this!
 --instance Monoidal k => Monoidal (ContType k r) where
 --  (Cont f) `x` (Cont g) = Cont $ join . (f `x` g) . unjoin
 --

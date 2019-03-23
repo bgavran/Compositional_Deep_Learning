@@ -9,29 +9,35 @@ import Data.NumInstances.Tuple
 import Numeric.LinearAlgebra.Array
 import Numeric.LinearAlgebra.Array.Util
 
+{-
+Unfortunately, there is a known bug which prevents quantifying constraints involving type families.
+https://gitlab.haskell.org/ghc/ghc/issues/14860
+This results in all the functions below having a list of constraints AllAllowed k [...]
+-}
+
 -- Standard haskell way to define a category
 class Category (k :: Type -> Type -> Type) where
     type Allowed k a :: Constraint
     type Allowed k a = ()
 
     id  :: Allowed k a => a `k` a
-    (.) :: Allowed3 k a b c => b `k` c -> a `k` b -> a `k` c
+    (.) :: AllAllowed k [a, b, c] => b `k` c -> a `k` b -> a `k` c
 
 -- By monoidal here we mean symmetric monoidal category
 class Category k => Monoidal (k :: Type -> Type -> Type) where
     -- unit object in haskell is ()
-    x :: Allowed6 k a b c d (a, b) (c, d)
+    x :: AllAllowed k [a, b, c, d, (a, b), (c, d)]
       => (a `k` c) -> (b `k` d) -> ((a, b) `k` (c, d))
-    assocL :: Allowed7 k a b c (a, b) ((a, b), c) (b, c) (a, (b, c))
+    assocL :: AllAllowed k [a, b, c, (a, b), ((a, b), c), (b, c), (a, (b, c))]
            => ((a, b), c) `k` (a, (b, c))
-    assocR :: Allowed7 k a b c (a, b) ((a, b), c) (b, c) (a, (b, c))
+    assocR :: AllAllowed k [a, b, c, (a, b), ((a, b), c), (b, c), (a, (b, c))]
            => (a, (b, c)) `k` ((a, b), c)
     unitorL :: Allowed k a
             => ((), a) `k` a
     unitorL' :: Allowed k a -- inverse of unitorL
             => a `k` ((), a)
     -- could also potentially add right unitor and their inverses
-    swap :: Allowed4 k a b (a, b) (b, a)
+    swap :: AllAllowed k [a, b, (a, b), (b, a)]
          => (a, b) `k` (b, a)
 
 class Monoidal k => Cartesian k where
@@ -67,12 +73,12 @@ class Category' (k :: Type -> Type -> Type -> Type) where
     type Allowed' k a = ()
 
     (.*) :: (Allowed' k a) => k () a a
-    (.-) :: (Allowed' k p, Allowed' k q, Allowed' k a, Allowed' k b, Allowed' k c, Allowed' k ((p, q), a), Allowed' k ((q, p), a), Allowed' k c, Allowed' k (q, (p, a)), Allowed' k (q, b), Allowed' k q, Allowed' k (p, a), Allowed' k b, Allowed' k p, Allowed' k a, Allowed' k (q, p), Allowed' k (p, q))
+    (.-) :: AllAllowed' k [p, q, a, b, c, (q, p), (p, q), ((p, q), a), ((q, p), a), (q, (p, a)), (q, b), (p, a)]
           => k q b c -> k p a b -> k (p, q) a c
 
 -- the constraints are unfortunately very ugly
 class Category' k => Monoidal' (k :: Type -> Type -> Type -> Type) where
-    (.|) :: (Allowed' k a, Allowed' k b, Allowed' k c, Allowed' k d, Allowed' k p, Allowed' k q, Allowed' k ((p, q), (a, b)), Allowed' k ((p, a), (q, b)), Allowed' k (c, d), Allowed' k (p, a), Allowed' k (q, b), Allowed' k (p, (q, (a, b))), Allowed' k (p, ((q, a), b)), Allowed' k (p, ((a, q), b)), Allowed' k (p, (a, (q, b))), Allowed' k (a, (q, b)), Allowed' k ((a, q), b), Allowed' k (a, q), Allowed' k ((q, a), b), Allowed' k (q, a), Allowed' k (q, (a, b)), Allowed' k (a, b), Allowed' k (p, q))
+    (.|) :: AllAllowed' k [a, b, c, d, p, q, ((p, q), (a, b)), ((p, a), (q, b)), (c, d), (p, a), (q, b), (p, (q, (a, b))), (p, ((q, a), b)), (p, ((a, q), b)), (p, (a, (q, b))), (a, (q, b)), ((a, q), b), (a, q), ((q, a), b), (q, a), (q, (a, b)), (a, b), (p, q)]
       => k p a c -> k q b d -> k (p, q) (a, b) (c, d)
 
 -- Sequential composition of parametrized functions
@@ -200,11 +206,10 @@ divide :: (Monoidal k, FractCat k a, _) => k (a, a) a
 divide = mulC . (id `x` recipC)
 -------------------------------------
 
-type Allowed2 k a b = (Allowed k a, Allowed k b)
-type Allowed3 k a b c = (Allowed2 k a b, Allowed k c)
-type Allowed4 k a b c d = (Allowed3 k a b c, Allowed k d)
-type Allowed5 k a b c d e = (Allowed4 k a b c d, Allowed k e)
-type Allowed6 k a b c d e f = (Allowed5 k a b c d e, Allowed k f)
-type Allowed7 k a b c d e f g = (Allowed6 k a b c d e f, Allowed k g)
-type Allowed8 k a b c d e f g h = (Allowed7 k a b c d e f g, Allowed k h)
-type Allowed9 k a b c d e f g h i = (Allowed8 k a b c d e f g i, Allowed k i)
+type family AllAllowed k xs :: Constraint where
+    AllAllowed k '[] = ()
+    AllAllowed k (x : xs) = (Allowed k x, AllAllowed k xs)
+
+type family AllAllowed' k xs :: Constraint where
+    AllAllowed' k '[] = ()
+    AllAllowed' k (x : xs) = (Allowed' k x, AllAllowed' k xs)
