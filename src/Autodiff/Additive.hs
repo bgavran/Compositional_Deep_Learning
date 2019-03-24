@@ -3,6 +3,7 @@ module Autodiff.Additive where
 import Prelude hiding (id, (.))
 import Control.Lens hiding ((#), para)
 import qualified Prelude as P
+import GHC.Exts (Constraint)
 
 import CategoricDefinitions
 import OnesLike
@@ -67,11 +68,6 @@ inrF = \b -> (zero, b)
 jamF = \(a, b) -> a ^+ b
 unitF = \_ -> zero -- this should probably be onesLike?
 
-type Additive2 a b = (Additive a, Additive b)
-type Additive3 a b c = (Additive2 a b, Additive c)
-type Additive4 a b c d = (Additive3 a b c, Additive d)
-type Additive5 a b c d e = (Additive4 a b c d, Additive e)
-type Additive6 a b c d e f = (Additive5 a b c d e, Additive f)
-type Additive7 a b c d e f g = (Additive6 a b c d e f, Additive g)
-type Additive8 a b c d e f g h = (Additive7 a b c d e f g, Additive h)
-type Additive9 a b c d e f g h i = (Additive8 a b c d e f g h , Additive i)
+type family AllAdditive xs :: Constraint where
+    AllAdditive '[] = ()
+    AllAdditive (x : xs) = (Additive x, AllAdditive xs)

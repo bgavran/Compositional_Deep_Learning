@@ -58,7 +58,7 @@ f d a = (d ^. evalDType.evalGAD) a ^. _1
 grad :: _ => DType a b -> a -> a
 grad dt' t  = grad' (counit . dt') t ()
 
-partiallyApply :: (Additive3 a b c) => DType (a, b) c -> a -> DType b c
+partiallyApply :: AllAdditive [a, b, c] => DType (a, b) c -> a -> DType b c
 partiallyApply dt a = D $ GAD $ \b -> second (.inr) $ (dt ^. evalDType.evalGAD) (a, b)
 
 
