@@ -33,7 +33,7 @@ instance Monoidal k => Monoidal' (ParaType k) where
 
 type ParaDType = ParaType DType
 
-type ParaLType = ParaType (AsymmetricLens DType)
+-- type ParaLType = ParaType (AsymmetricLens DType)
 
 data LearnerType p a b = Learner {
     _p :: p,
