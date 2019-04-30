@@ -10,8 +10,7 @@ It's a compositional approach to organizing and layering different abstractions 
 * Notion of multi-agent neural networks 
 
 As more and more components of our deep learning systems stop being fixed throughout training, there is an increasingly larger need for more precise formal specification of the things that _do_ stay fixed.
-Standard methods don't seem to be as effective: the invariants across all these
-networks seem to be rather abstract and hard to describe. This repository explores the speculation that the language of category theory could be well suited to describe and quantify these structures.
+Standard methods don't seem to be as effective: the invariants across all these networks seem to be rather abstract and hard to describe. This repository explores the speculation that the language of category theory could be well suited to describe and quantify these structures.
 
 Focus is currently not on reimplementation of popular new network architectures, but rather on principled, structured design of both neural networks and the way they are trained.
 
@@ -40,6 +39,7 @@ Progress so far:
 * Find a suitable tensor library with the following features:
   * Static tensor shapes, known and type-checked at compile time
   * Some variant of Einstein summation notation for handling of tensors of arbitrary rank
+I'm working on one such library in Idris, which implements [Dependently Typed Einstein Summation](https://github.com/bgavran/Dependently_Typed_Einsum).
 * Provide working examples of training simple neural networks
 * Find a way to graphically show composition of **GAD**, **Para** and **Learners**
 * Explore using effects for data loading
