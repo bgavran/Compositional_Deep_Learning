@@ -1,6 +1,6 @@
 ### Compositional Deep Learning
 
-**Update May 2020:** It's important to note that while eventual implementation of neural networks from first principles is my main goal, I've currently shifted to purely category-theoretic perspective, which is at the moment not in software and mostly all on paper. This is why for a while there hasn't been any developments in this repo, although I plan on getting back to it.
+**Update May 2020:** It's important to note that while eventual implementation of neural networks from first principles is my main goal, I've currently shifted to studying them from a category-theoretic perspective. This is being done in collaboration with some other people and is mostly theory right now. This is why for a while there hasn't been any developments in this repo, although I plan on getting back to it.
 
 This is a long-term project of understanding and reimplementing neural networks from first principles using the language of category theory.
 It's a compositional approach to organizing and layering different abstractions found in neural networks:
